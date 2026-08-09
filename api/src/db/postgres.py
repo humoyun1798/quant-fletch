@@ -35,6 +35,24 @@ def init_schema(conn: psycopg.Connection) -> None:
             )
         """)
 
+        # Phase 2.5: ETF 元数据补全列 (ponytail: ALTER TABLE IF NOT EXISTS 无标准语法, 用信息模式检查)
+        cur.execute("""
+            DO $$ BEGIN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                               WHERE table_name='etf_info' AND column_name='fund_size') THEN
+                    ALTER TABLE etf_info ADD COLUMN fund_size NUMERIC(16,2);
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                               WHERE table_name='etf_info' AND column_name='tracking_error') THEN
+                    ALTER TABLE etf_info ADD COLUMN tracking_error NUMERIC(7,4);
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                               WHERE table_name='etf_info' AND column_name='premium_discount') THEN
+                    ALTER TABLE etf_info ADD COLUMN premium_discount NUMERIC(7,4);
+                END IF;
+            END $$;
+        """)
+
         cur.execute("""
             CREATE TABLE IF NOT EXISTS backtest_run (
                 run_id      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -46,6 +64,16 @@ def init_schema(conn: psycopg.Connection) -> None:
                 metrics     JSONB,
                 created_at  TIMESTAMPTZ DEFAULT now(),
                 finished_at TIMESTAMPTZ
+            )
+        """)
+
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS sector_index (
+                industry_code VARCHAR PRIMARY KEY,
+                industry_name VARCHAR NOT NULL,
+                level         SMALLINT DEFAULT 1,
+                created_at    TIMESTAMPTZ DEFAULT now(),
+                updated_at    TIMESTAMPTZ DEFAULT now()
             )
         """)
         conn.commit()

@@ -189,3 +189,11 @@ class BaseStrategy(ABC):
     ) -> None:
         """步骤 7: 策略内部状态更新"""
         pass
+
+    def on_tick(self, tick: dict) -> None:
+        """v3.0: 日内 tick 回调, 日内策略覆写"""
+        pass
+
+    def on_level2(self, orderbook: dict) -> None:
+        """v3.0: Level2 盘口回调, 大资金策略覆写"""
+        pass

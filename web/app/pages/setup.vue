@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { shallowRef, onMounted, onUnmounted } from '#imports'
 import ErrorAlert from '../components/ErrorAlert.vue'
+import { WS_BASE } from '../config/api'
 
 interface SeedProgress {
   step: string
@@ -31,7 +32,7 @@ async function checkStatus() {
 function connectSeedWs(wsUrl: string) {
   if (ws) { ws.close(); ws = null }
 
-  ws = new WebSocket(`ws://localhost:8000${wsUrl}`)
+  ws = new WebSocket(`${WS_BASE}${wsUrl}`)
   ws.onmessage = (e) => {
     const msg = JSON.parse(e.data)
     seedProgress.value = { ...seedProgress.value, ...msg }

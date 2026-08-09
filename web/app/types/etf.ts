@@ -1,15 +1,14 @@
-// ETF 列表项 — 与 GET /api/v1/etfs 响应字段对齐
-// 手动同步自 api/src/server/routes/etfs.py:67-77, shared/schemas/ 落地前维护
+// ETF 列表项 — 与 GET /api/v1/etfs 响应字段对齐 (api/src/server/routes/etfs.py:67-77)
 export interface ETF {
   code: string
   name: string
   type: 'broad' | 'sector' | 'bond' | 'commodity'
   underlying: string
-  inception: string
-  expense: number
-  latest_date: string
-  latest_close: number
-  change_pct: number
+  inception: string | null
+  expense: number | null
+  latest_date: string | null
+  latest_close: number | null
+  change_pct: number | null
 }
 
 export interface OHLCV {

@@ -77,6 +77,31 @@ def init_schema(conn: duckdb.DuckDBPyConnection) -> None:
         )
     """)
 
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS sector_daily (
+            industry_code VARCHAR NOT NULL,
+            industry_name VARCHAR NOT NULL,
+            date          DATE NOT NULL,
+            open          DOUBLE,
+            high          DOUBLE,
+            low           DOUBLE,
+            close         DOUBLE,
+            volume        DOUBLE,
+            amount        DOUBLE,
+            change_pct    DOUBLE,
+            PRIMARY KEY (industry_code, date)
+        )
+    """)
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS etf_sector_map (
+            etf_code       VARCHAR NOT NULL PRIMARY KEY,
+            industry_code  VARCHAR NOT NULL,
+            industry_name  VARCHAR NOT NULL,
+            verified       BOOLEAN DEFAULT FALSE
+        )
+    """)
+
     logger.info('DuckDB schema 初始化完成')
 
 

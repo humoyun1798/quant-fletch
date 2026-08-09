@@ -62,20 +62,27 @@ class TestAdjustClose:
         })
         ref = pl.DataFrame({
             'date': [date(2024, 1, 1), date(2024, 1, 2)],
-            'close': [9.5, 10.8],
+            'adj_close': [9.5, 10.8],
         })
         result = _adjust_close(df, ref)
         assert 'adj_close' in result.columns
-        # First date uses ref value directly
+        # First date uses ref adj_close value directly
         assert result['adj_close'][0] == pytest.approx(9.5)
 
-    def test_falls_back_to_close_when_no_ref(self):
+    def test_falls_back_to_close_when_ref_missing_column(self):
+        """ref lacks 'adj_close' column → falls through to close."""
         df = pl.DataFrame({
             'date': [date(2024, 1, 1)],
             'close': [10.0],
         })
-        result = _adjust_close(df, df)  # ref has matching dates
+        ref = pl.DataFrame({
+            'date': [date(2024, 1, 1)],
+            'close': [9.0],
+        })
+        result = _adjust_close(df, ref)
         assert 'adj_close' in result.columns
+        # ref has no 'adj_close' column → uses close directly
+        assert result['adj_close'][0] == pytest.approx(10.0)
 
     def test_no_matching_dates_uses_close(self):
         """When ref has no matching dates, falls through to close."""
@@ -85,7 +92,7 @@ class TestAdjustClose:
         })
         ref = pl.DataFrame({
             'date': [date(2024, 2, 1)],  # different date
-            'close': [9.0],
+            'adj_close': [9.0],
         })
         result = _adjust_close(df, ref)
         assert 'adj_close' in result.columns
@@ -137,7 +144,7 @@ class TestCleanPipeline:
         assert result.sort('date')['adj_close'].to_list() == pytest.approx([3.82, 3.81])
 
     def test_with_adj_ref(self):
-        """Full pipeline with adj_close_ref uses reference prices."""
+        """Full pipeline with adj_close_ref uses reference adj_close prices."""
         df = pl.DataFrame({
             'date': [date(2024, 1, 1)],
             'open': [3.80], 'high': [3.85], 'low': [3.78],
@@ -145,7 +152,7 @@ class TestCleanPipeline:
         })
         ref = pl.DataFrame({
             'date': [date(2024, 1, 1)],
-            'close': [3.90],  # adjusted price differs from raw close
+            'adj_close': [3.90],  # adjusted price differs from raw close
         })
         result = clean_etf_data('510300.SH', df, adj_close_ref=ref)
         assert result['adj_close'][0] == pytest.approx(3.90)

@@ -43,34 +43,54 @@ def _deduplicate(df: pl.DataFrame) -> pl.DataFrame:
 def _adjust_close(df: pl.DataFrame, ref: pl.DataFrame) -> pl.DataFrame:
     """前复权校准。
 
-    首次拉取时用东方财富 adjust='qfq' 获取前复权 close 作为基准列。
-    后续增量更新用 Sina 涨跌幅递推: adj_close[t] = adj_close[t-1] * (close[t] / prevclose[t])
+    首次拉取时用东方财富 adjust='qfq' 获取前复权 close 作为基准列,
+    ref 的 adj_close 列用于已有日期的精确值。
+    后续增量更新（Sina 降级路径）用涨跌幅递推:
+        adj_close[t] = adj_close[t-1] * (close[t] / prevclose[t])
+    其中 prevclose 是 Sina 返回的前收盘价。
     """
-    # ponytail: 仅支持已有 ref 的校准, 增量递推在 v1.1 实现
-    if 'date' not in ref.columns or 'close' not in ref.columns:
-        logger.warning('前复权参考数据缺少 date/close 列, 跳过校准')
+    # ponytail: 涨跌幅递推用 prevclose 近似, 精确递推需要复权因子, 当数据源提供复权因子时替换
+    if 'date' not in ref.columns or 'adj_close' not in ref.columns:
+        logger.warning('前复权参考数据缺少 date/adj_close 列, 跳过校准')
         return df.with_columns(pl.col('close').alias('adj_close'))
 
-    ref_map = dict(zip(ref['date'].to_list(), ref['close'].to_list()))
-    adj_close_values: list[float] = []
-    prev_adj = None
+    # ponytail: 先排序确保迭代顺序 = with_columns 写入顺序 (Polars 按位置对齐)
+    df = df.sort('date')
 
-    for row in df.sort('date').rows():
-        d: date = row[df.columns.index('date')]
-        close_val: float = row[df.columns.index('close')]
+    ref_map = dict(zip(ref['date'].to_list(), ref['adj_close'].to_list()))
+
+    date_idx = df.columns.index('date')
+    close_idx = df.columns.index('close')
+    has_prevclose = 'prevclose' in df.columns
+    prevclose_idx = df.columns.index('prevclose') if has_prevclose else -1
+
+    adj_values: list[float] = []
+    prev_adj: float | None = None
+    prev_close: float | None = None
+
+    for row in df.rows():
+        d = row[date_idx]
+        close_val = float(row[close_idx])
+
         if d in ref_map:
-            adj = ref_map[d]
-        elif prev_adj is not None:
-            # 用涨跌幅递推
-            # ponytail: 当日涨跌幅无直接来源, 用 close/prevclose 近似
-            # 精确递推在 v1.1 改用 preclose 列
-            adj = prev_adj
+            adj = float(ref_map[d])
+        elif prev_adj is not None and has_prevclose:
+            prevclose_val = float(row[prevclose_idx])
+            if prevclose_val != 0:
+                adj = prev_adj * (close_val / prevclose_val)
+            else:
+                adj = prev_adj
+        elif prev_adj is not None and prev_close is not None and prev_close != 0:
+            # ponytail: 无 prevclose 列时的近似, 当数据源提供 prevclose 后自动走上方分支
+            adj = prev_adj * (close_val / prev_close)
         else:
             adj = close_val
-        adj_close_values.append(adj)
-        prev_adj = adj
 
-    return df.with_columns(pl.Series('adj_close', adj_close_values))
+        adj_values.append(adj)
+        prev_adj = adj
+        prev_close = close_val
+
+    return df.with_columns(pl.Series('adj_close', adj_values))
 
 
 def _impute_missing(df: pl.DataFrame) -> pl.DataFrame:

@@ -53,4 +53,5 @@ addopts = "--cov=src --cov-report=term-missing --strict-markers"
 markers = [
     "unit: Unit tests",
     "integration: Integration tests",
+    "slow: Slow tests (backtest, E2E, full pipeline)",
 ]

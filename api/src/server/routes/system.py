@@ -169,3 +169,121 @@ async def _run_seed(mode: str) -> None:
         logger.exception('种子任务失败')
         if q:
             await q.put({'step': 'error', 'message': str(e)})
+
+
+# ── Phase 2.2: 增量数据更新 ──────────────────────────────────────────────────
+
+
+@router.post('/update')
+async def incremental_update(body: dict[str, Any]) -> dict[str, Any]:
+    """拉取最近 N 个交易日数据, 校验后追加到 DuckDB (不覆盖已有)
+
+    ponytail: 复用种子流程的数据源和校验逻辑, 仅 APPEND 模式差异
+    升级路径: 当 ETF > 50 时引入连接池 + 断点续传
+    """
+    import datetime as dt
+
+    from data.calendar import get_calendar
+    from data.cleaner import clean_etf_data
+    from data.seed.etf_config import ETF_POOL
+    from data.sources.eastmoney import EastMoneySource
+    from data.sources.sina import SinaSource
+    from data.validator import validate_etf_data
+    from db.duckdb import get_conn as duckdb_conn
+
+    days = body.get('days', 10)
+    mode = body.get('mode', 'latest')  # 'latest' | 'since' (从最后数据日补全)
+
+    ddb = duckdb_conn()
+    try:
+        # 确定需要拉取的日期范围
+        if mode == 'since':
+            try:
+                last_date_row = ddb.execute(
+                    'SELECT MAX(date) FROM etf_daily',
+                ).fetchone()
+                if last_date_row and last_date_row[0]:
+                    since_date = last_date_row[0]
+                    if isinstance(since_date, dt.date):
+                        start_str = since_date.strftime('%Y%m%d')
+                    else:
+                        start_str = str(since_date)[:10].replace('-', '')
+                else:
+                    start_str = (dt.date.today() - dt.timedelta(days=365)).strftime('%Y%m%d')
+            except Exception:
+                start_str = (dt.date.today() - dt.timedelta(days=365)).strftime('%Y%m%d')
+        else:
+            cal = get_calendar()
+            try:
+                cal.load()
+                trading_days = cal.get_trading_days(
+                    dt.date.today() - dt.timedelta(days=days * 2),
+                    dt.date.today(),
+                )
+                start_str = trading_days[-days].strftime('%Y%m%d') if len(trading_days) >= days \
+                    else (dt.date.today() - dt.timedelta(days=days)).strftime('%Y%m%d')
+            except Exception:
+                start_str = (dt.date.today() - dt.timedelta(days=days)).strftime('%Y%m%d')
+
+        today_str = dt.date.today().strftime('%Y%m%d')
+        em = EastMoneySource()
+        sina = SinaSource()
+
+        updated: list[dict[str, Any]] = []
+        failed: list[dict[str, Any]] = []
+        total = len(ETF_POOL)
+
+        for i, etf in enumerate(ETF_POOL):
+            try:
+                # 拉取增量数据
+                try:
+                    raw_df = em.fetch(etf.em_symbol, start_str, today_str, adjust='qfq')
+                except Exception:
+                    raw_df = sina.fetch(etf.sina_symbol)
+
+                if raw_df.is_empty():
+                    failed.append({'code': etf.code, 'reason': '空数据'})
+                    continue
+
+                # 校验 + 清洗
+                report = validate_etf_data(etf.code, raw_df)
+                if not report.passed:
+                    failed.append({'code': etf.code, 'reason': f'校验失败: {report.errors}'})
+                    continue
+
+                clean_df = clean_etf_data(etf.code, raw_df)
+
+                # APPEND 模式: 用 INSERT OR IGNORE 避免重复 (有 date+code 唯一约束)
+                # 先删同 ETF 同日期范围的行, 再 INSERT (upsert)
+                existing_dates = ddb.execute(
+                    'SELECT date FROM etf_daily WHERE code = ? AND date >= ?',
+                    [etf.code, start_str],
+                ).fetchall()
+                existing_set = {row[0] for row in existing_dates}
+
+                new_rows = clean_df.filter(
+                    ~pl.col('date').is_in(existing_set),
+                )
+                if not new_rows.is_empty():
+                    ddb.execute('INSERT INTO etf_daily SELECT * FROM new_rows')
+
+                updated.append({
+                    'code': etf.code, 'name': etf.name,
+                    'new_rows': len(new_rows),
+                })
+
+            except Exception as e:
+                failed.append({'code': etf.code, 'reason': str(e)})
+
+    finally:
+        ddb.close()
+
+    return {
+        'data': {
+            'start_date': f'{start_str[:4]}-{start_str[4:6]}-{start_str[6:]}',
+            'end_date': f'{today_str[:4]}-{today_str[4:6]}-{today_str[6:]}',
+            'updated': updated,
+            'failed': failed,
+            'summary': f'更新 {len(updated)} 只 ETF, 失败 {len(failed)} 只',
+        },
+    }

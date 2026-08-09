@@ -2,7 +2,7 @@
 import { shallowRef, onMounted } from '#imports'
 import { useETFData } from '../composables/useETFData'
 import { useMotion } from '../composables/useMotion'
-import type { Bar, BarPeriod } from '../types/etf'
+import type { Bar, BarPeriod, ETF } from '../types/etf'
 import ETFPicker from '../components/ETFPicker.vue'
 import KlineChart from '../components/KlineChart.vue'
 import OHLCVTable from '../components/OHLCVTable.vue'
@@ -33,7 +33,7 @@ async function fetchData() {
   if (data) barData.value = data
 }
 
-async function onSelect(etf: any) {
+async function onSelect(etf: ETF) {
   selectedCode.value = etf.code
   await fetchData()
 }

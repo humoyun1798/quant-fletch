@@ -133,11 +133,17 @@ class VectorBTAdapter:
         # 构建价格 DataFrame: 从 FeatureService 获取 close 并透视
         # ponytail: pivot 构建 price_df, 当 ETF > 50 只时改用稀疏矩阵
         price_df = feature_service.get_price_df(config.start_date, config.end_date)
+        if price_df.is_empty():
+            return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+
         price_pivot = price_df.filter(
             pl.col('code').is_in(codes),
         ).pivot(
             values='close', index='date', columns='code',
         ).sort('date')
+
+        if price_pivot.is_empty():
+            return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
         price_pd = price_pivot.to_pandas().set_index('date')
         # Normalize both indexes to pd.Timestamp to avoid dtype mismatch
         # (polars Date → datetime64[us] vs entries.date → datetime64[ns])

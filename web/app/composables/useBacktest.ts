@@ -1,6 +1,7 @@
 // @env browser
 import { shallowRef } from '#imports'
 import type { BacktestResult, BacktestConfig } from '../types/backtest'
+import { WS_BASE } from '../config/api'
 
 // 模块级单例 — strategy 页和 signals 页共享同一份回测状态
 const status = shallowRef<'idle' | 'queued' | 'running' | 'completed' | 'failed'>('idle')
@@ -25,7 +26,7 @@ export function useBacktest() {
       status.value = 'running'
 
       // WebSocket 进度跟踪 — 直连 API 服务器 (Vite proxy 不代理 WS upgrade)
-      const ws = new WebSocket(`ws://localhost:8000${ws_url}`)
+      const ws = new WebSocket(`${WS_BASE}${ws_url}`)
 
       ws.onmessage = (e) => {
         const msg = JSON.parse(e.data)

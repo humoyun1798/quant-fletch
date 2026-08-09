@@ -4,10 +4,24 @@ import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import date
+from typing import Protocol
 
 import polars as pl
 
 logger = logging.getLogger(__name__)
+
+
+class OHLCVSource(Protocol):
+    """OHLCV 数据源协议 — SinaSource / EastMoneySource 自然符合。
+    未来 PTrade / Wind / Tushare Pro 加实现类即可, 不绑死任一券商生态。
+    """
+    NAME: str
+
+    def fetch(
+        self, symbol: str, start: str, end: str, adjust: str = '',
+    ) -> pl.DataFrame: ...
+
+    def health_check(self) -> bool: ...
 
 
 @dataclass(frozen=True)
