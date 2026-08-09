@@ -5,11 +5,11 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/quantfletch/quant-fletch/actions/workflows/unit-test.yml"><img src="https://github.com/quantfletch/quant-fletch/actions/workflows/unit-test.yml/badge.svg" alt="Test" /></a>
-  <a href="https://github.com/quantfletch/quant-fletch/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License" /></a>
+  <a href="https://github.com/AbelTami/quant-fletch/actions/workflows/unit-test.yml"><img src="https://github.com/AbelTami/quant-fletch/actions/workflows/unit-test.yml/badge.svg" alt="Test" /></a>
+  <a href="https://github.com/AbelTami/quant-fletch/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License" /></a>
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.14-blue.svg" alt="Python 3.14" /></a>
   <a href="https://nodejs.org/"><img src="https://img.shields.io/badge/node-%E2%89%A522-brightgreen.svg" alt="Node" /></a>
-  <a href="https://github.com/quantfletch/quant-fletch"><img src="https://img.shields.io/github/stars/quantfletch/quant-fletch?style=social" alt="Stars" /></a>
+  <a href="https://github.com/AbelTami/quant-fletch"><img src="https://img.shields.io/github/stars/AbelTami/quant-fletch?style=social" alt="Stars" /></a>
 </p>
 
 ---
@@ -28,7 +28,7 @@ Quant-Fletch 是一个面向国内量化投资者的 A 股 ETF 轮动系统。�
 
 ```bash
 # 1. 克隆
-git clone https://github.com/quantfletch/quant-fletch.git
+git clone https://github.com/AbelTami/quant-fletch.git
 cd quant-fletch
 
 # 2. 拉取行情数据（首次约需 10 分钟）
@@ -148,7 +148,7 @@ BacktestConfig ───┤
 - FeatureService 因子引擎已实现但尚未接入回测主循环
 - 分钟线数据已拉取但回测引擎仅支持日频
 
-详见 [迭代方案](https://github.com/quantfletch/quant-fletch/blob/main/docs/迭代/README.md)。
+详见 [迭代方案](https://github.com/AbelTami/quant-fletch/blob/main/docs/迭代/README.md)。
 
 ## 贡献
 
