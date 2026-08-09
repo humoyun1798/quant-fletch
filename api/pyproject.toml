@@ -1,0 +1,56 @@
+[project]
+name = "quant-fletch-api"
+version = "0.1.0"
+description = "Quant-Fletch A-share ETF quantitative rotation system - API backend"
+requires-python = ">=3.14"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "akshare>=1.18.0",
+    "polars>=1.0.0",
+    "pandas>=2.2.0",
+    "pyarrow>=17.0.0",
+    "duckdb>=1.1.0",
+    "psycopg[binary]>=3.2.0",
+    "websockets>=14.0",
+    "pydantic>=2.0.0",
+    "httpx>=0.28.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "black>=24.0.0",
+    "isort>=5.13.0",
+    "ruff>=0.6.0",
+    "mypy>=1.13.0",
+    "bandit>=1.7.0",
+    "pytest>=8.0.0",
+    "pytest-cov>=6.0.0",
+    "pytest-asyncio>=0.24.0",
+]
+
+[tool.black]
+line-length = 88
+target-version = ["py314"]
+
+[tool.isort]
+profile = "black"
+line_length = 88
+
+[tool.ruff]
+line-length = 88
+target-version = "py314"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "B", "C4", "SIM", "UP"]
+
+[tool.mypy]
+strict = true
+python_version = "3.14"
+
+[tool.pytest.ini_options]
+addopts = "--cov=src --cov-report=term-missing --strict-markers"
+markers = [
+    "unit: Unit tests",
+    "integration: Integration tests",
+]

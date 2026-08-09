@@ -1,0 +1,8 @@
+/* global CSS with CJK font fallback */
+.font-sans {
+  font-family: 'DM Sans', 'Noto Sans SC', system-ui, sans-serif;
+}
+
+.font-mono {
+  font-family: 'DM Mono', monospace;
+}

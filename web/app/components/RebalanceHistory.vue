@@ -1,0 +1,50 @@
+<script setup lang="ts">
+import type { SignalResult } from '../types/signal'
+import EmptyState from './EmptyState.vue'
+
+interface Props {
+  signals: SignalResult[]
+}
+
+defineProps<Props>()
+</script>
+
+<template>
+  <section class="p-3 border-t border-base">
+    <h2 class="text-sm font-medium color-base mb-2">Rebalance History</h2>
+
+    <EmptyState
+      v-if="signals.length === 0"
+      icon="i-ph-list-numbers-duotone"
+      title="无调仓记录"
+      description="回测完成后调仓历史会出现在这里"
+    />
+
+    <div v-else class="overflow-x-auto">
+      <table class="w-full text-xs">
+        <thead>
+          <tr class="border-b border-base text-left op-fade text-micro uppercase tracking-wide">
+            <th class="px-2 py-1 font-medium">Date</th>
+            <th class="px-2 py-1 font-medium">Positions</th>
+            <th class="px-2 py-1 font-medium">Turnover</th>
+            <th class="px-2 py-1 font-medium">Cash</th>
+            <th class="px-2 py-1 font-medium">Summary</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr
+            v-for="s in signals.slice(-20)"
+            :key="s.date"
+            class="border-b border-base/50 hover:bg-active transition-colors duration-100"
+          >
+            <td class="px-2 py-1 font-mono tabular-nums">{{ s.date }}</td>
+            <td class="px-2 py-1 font-mono tabular-nums">{{ s.total_positions }}</td>
+            <td class="px-2 py-1 font-mono tabular-nums">{{ (s.turnover * 100).toFixed(1) }}%</td>
+            <td class="px-2 py-1 font-mono tabular-nums">{{ (s.cash_ratio * 100).toFixed(1) }}%</td>
+            <td class="px-2 py-1 truncate max-w-[300px]" :title="s.summary">{{ s.summary }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</template>

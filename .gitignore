@@ -1,0 +1,50 @@
+# Dependencies
+node_modules
+api/.venv
+
+# Build
+dist
+.output
+.nuxt
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.egg-info
+.pytest_cache
+.coverage
+htmlcov
+
+# DuckDB
+*.duckdb
+*.duckdb.wal
+
+# Data files (user-generated)
+api/data/raw/
+api/data/*.duckdb
+
+# Docker
+pgdata/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test
+web/test-results/
+web/playwright-report/

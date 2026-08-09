@@ -1,0 +1,26 @@
+{
+  "name": "quant-fletch",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm run -r dev",
+    "build": "pnpm run -r build",
+    "lint": "eslint . --cache --concurrency=auto",
+    "test": "pnpm run -r test",
+    "typecheck": "pnpm run -r typecheck",
+    "prepare": "npx simple-git-hooks"
+  },
+  "simple-git-hooks": {
+    "pre-commit": "pnpm i --frozen-lockfile --ignore-scripts --offline && npx lint-staged"
+  },
+  "lint-staged": {
+    "*": "eslint --fix"
+  },
+  "devDependencies": {
+    "@antfu/eslint-config": "catalog:dev",
+    "@unocss/nuxt": "^66.7.5",
+    "@unocss/preset-web-fonts": "^66.7.5",
+    "lint-staged": "catalog:dev",
+    "simple-git-hooks": "catalog:dev"
+  }
+}
