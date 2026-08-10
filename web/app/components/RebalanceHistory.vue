@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { SignalResult } from '../types/signal'
-import EmptyState from './EmptyState.vue'
+import FeedbackEmptyState from '@antfu/design/components/Feedback/FeedbackEmptyState.vue'
 
 interface Props {
   signals: SignalResult[]
@@ -10,15 +10,18 @@ defineProps<Props>()
 </script>
 
 <template>
-  <section class="p-3 border-t border-base">
-    <h2 class="text-sm font-medium color-base mb-2">Rebalance History</h2>
+  <section class="px-3 py-2">
+    <h2 class="text-sm font-medium color-base mb-1">Rebalance History</h2>
 
-    <EmptyState
+    <FeedbackEmptyState
       v-if="signals.length === 0"
       icon="i-ph-list-numbers-duotone"
       title="无调仓记录"
-      description="回测完成后调仓历史会出现在这里"
-    />
+    >
+      <template #hint>
+        回测完成后调仓历史会出现在这里
+      </template>
+    </FeedbackEmptyState>
 
     <div v-else class="overflow-x-auto">
       <table class="w-full text-xs">
@@ -33,7 +36,7 @@ defineProps<Props>()
         </thead>
         <tbody>
           <tr
-            v-for="s in signals.slice(-20)"
+            v-for="s in [...signals].reverse().slice(0, 20)"
             :key="s.date"
             class="border-b border-base/50 hover:bg-active transition-colors duration-100"
           >

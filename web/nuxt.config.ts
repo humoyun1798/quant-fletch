@@ -24,8 +24,14 @@ export default defineNuxtConfig({
   },
 
   routeRules: {
-    '/api/**': { proxy: 'http://localhost:8000/api/**' },
+    '/api/**': { proxy: 'http://localhost:8001/api/**' },
   },
 
   devtools: { enabled: true },
+
+  vite: {
+    optimizeDeps: {
+      include: ['floating-vue', 'reka-ui', 'splitpanes', '@antfu/utils'],
+    },
+  },
 })

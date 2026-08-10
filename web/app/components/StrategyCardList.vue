@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { shallowRef, watch, onMounted, nextTick } from '#imports'
+import { shallowRef, onMounted } from '#imports'
 import { useStrategy } from '../composables/useStrategy'
 import { useMotion } from '../composables/useMotion'
-import LoadingSkeleton from './LoadingSkeleton.vue'
+import FeedbackSkeleton from '@antfu/design/components/Feedback/FeedbackSkeleton.vue'
 
 const { strategies, selected, fetchAll, selectStrategy } = useStrategy()
 const { glowPulse, safeGsap } = useMotion()
@@ -36,7 +36,7 @@ function onSelect(name: string) {
   <section class="p-3 border-b border-base">
     <h2 class="text-sm font-medium color-base mb-2">Available Strategies</h2>
 
-    <LoadingSkeleton v-if="loading" :rows="5" type="table" />
+    <FeedbackSkeleton v-if="loading" variant="text" :lines="5" />
 
     <div v-else-if="strategies.length === 0" class="text-xs op-fade">
       暂无可用策略

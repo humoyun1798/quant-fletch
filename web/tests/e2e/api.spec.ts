@@ -173,7 +173,7 @@ test.describe('Backtest API', () => {
     const run_id = created.run_id
 
     // Poll for completion (up to 15s)
-    let result: any = null
+    let result: Record<string, unknown> | null = null
     for (let i = 0; i < 15; i++) {
       const statusResp = await request.get(`${API}/api/v1/backtest/${run_id}`)
       if (statusResp.status() === 200) {

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { navigateTo } from '#imports'
 
-navigateTo('/dashboard', { replace: true })
+navigateTo('/dashboard', { redirectCode: 302 })
 </script>
 
 <template>

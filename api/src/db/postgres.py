@@ -15,7 +15,7 @@ _DATABASE_URL = os.environ.get(
 
 def get_conn() -> psycopg.Connection:
     """获取 PostgreSQL 连接。调用方负责关闭。"""
-    return psycopg.connect(_DATABASE_URL)
+    return psycopg.connect(_DATABASE_URL, connect_timeout=5)
 
 
 def init_schema(conn: psycopg.Connection) -> None:

@@ -3,7 +3,7 @@
 // 背景粒子场 - 暗色背景上稀疏微光点缓慢漂浮 (50-80 particles, canvas 60fps)
 import { shallowRef, onMounted, onUnmounted, useNuxtApp } from '#imports'
 
-const { $gsap: gsap, $gsapLowPerf: lowPerf } = useNuxtApp() as any
+const { $gsapLowPerf: lowPerf } = useNuxtApp() as { $gsapLowPerf: boolean }
 const canvasRef = shallowRef<HTMLCanvasElement>()
 
 interface Particle {

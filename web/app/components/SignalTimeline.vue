@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { SignalResult } from '../types/signal'
-import EmptyState from './EmptyState.vue'
+import FeedbackEmptyState from '@antfu/design/components/Feedback/FeedbackEmptyState.vue'
 
 interface Props {
   signals: SignalResult[]
@@ -13,12 +13,15 @@ defineProps<Props>()
   <section class="p-3">
     <h2 class="text-sm font-medium color-base mb-2">Signal Timeline</h2>
 
-    <EmptyState
+    <FeedbackEmptyState
       v-if="signals.length === 0"
       icon="i-ph-clock-counter-clockwise-duotone"
       title="暂无信号记录"
-      description="回测运行后信号时间线会在这里展示"
-    />
+    >
+      <template #hint>
+        回测运行后信号时间线会在这里展示
+      </template>
+    </FeedbackEmptyState>
 
     <div v-else class="flex flex-col gap-1">
       <div
@@ -28,7 +31,7 @@ defineProps<Props>()
       >
         <div class="flex flex-col items-center shrink-0">
           <span class="font-mono tabular-nums text-micro op-fade w-[80px]">{{ s.date }}</span>
-          <div class="w-px flex-1 bg-#8882 mt-0.5" :class="{ 'op-0': i === 0 }" />
+          <div class="w-px flex-1 bg-active mt-0.5" :class="{ 'op-0': i === 0 }" />
         </div>
         <div class="flex flex-col gap-0.5">
           <p class="text-xs color-base">{{ s.summary }}</p>

@@ -1,6 +1,11 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { useETFData } from '../../app/composables/useETFData'
 
+const mockFetch = vi.fn()
+vi.mock('#build/fetch.mjs', () => ({
+  $fetch: (...args: unknown[]) => mockFetch(...args),
+}))
+
 const mockETFs = [
   {
     code: '510300.SH',
@@ -28,7 +33,7 @@ const mockETFs = [
 
 describe('useETFData', () => {
   beforeEach(() => {
-    vi.stubGlobal('$fetch', vi.fn())
+    mockFetch.mockReset()
   })
 
   it('initial state is empty', () => {
@@ -39,8 +44,7 @@ describe('useETFData', () => {
   })
 
   it('fetchAll populates etfs and clears loading', async () => {
-    const mockFetch = vi.fn().mockResolvedValue({ data: mockETFs })
-    vi.stubGlobal('$fetch', mockFetch)
+    mockFetch.mockResolvedValue({ data: mockETFs })
 
     const { etfs, loading, error, fetchAll } = useETFData()
     const promise = fetchAll()
@@ -53,7 +57,7 @@ describe('useETFData', () => {
   })
 
   it('fetchAll sets error on failure', async () => {
-    vi.stubGlobal('$fetch', vi.fn().mockRejectedValue(new Error('Network error')))
+    mockFetch.mockRejectedValue(new Error('Network error'))
     const { etfs, error, loading, fetchAll } = useETFData()
     await fetchAll()
     expect(etfs.value).toEqual([])
@@ -63,14 +67,14 @@ describe('useETFData', () => {
 
   it('fetchOHLCV returns data array', async () => {
     const ohlcvData = [{ date: '2024-01-01', open: 1, high: 2, low: 0.5, close: 1.5, volume: 1000 }]
-    vi.stubGlobal('$fetch', vi.fn().mockResolvedValue({ data: ohlcvData }))
+    mockFetch.mockResolvedValue({ data: ohlcvData })
     const { fetchOHLCV } = useETFData()
     const result = await fetchOHLCV('510300.SH', '2024-01-01', '2024-01-31')
     expect(result).toEqual(ohlcvData)
   })
 
   it('fetchOHLCV returns empty on error', async () => {
-    vi.stubGlobal('$fetch', vi.fn().mockRejectedValue(new Error('Not found')))
+    mockFetch.mockRejectedValue(new Error('Not found'))
     const { fetchOHLCV, error } = useETFData()
     const result = await fetchOHLCV('NONEXIST', '2024-01-01', '2024-01-31')
     expect(result).toEqual([])

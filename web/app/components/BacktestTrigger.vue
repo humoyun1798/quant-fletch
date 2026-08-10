@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { shallowRef, useNuxtApp } from '#imports'
+import { shallowRef, computed, useNuxtApp } from '#imports'
 import { useMotion } from '../composables/useMotion'
-import StatusBadge from './StatusBadge.vue'
+import DisplayBadge from '@antfu/design/components/Display/DisplayBadge.vue'
 
 interface Props {
   status: string
@@ -9,7 +9,7 @@ interface Props {
   disabled: boolean
 }
 
-defineProps<Props>()
+const props = defineProps<Props>()
 
 interface Emits {
   (e: 'run'): void
@@ -42,6 +42,16 @@ function onPointerUp() {
 function onClick() {
   emit('run')
 }
+
+const badgeText = computed(() => {
+  const map: Record<string, string> = { running: '运行中', completed: '已完成', failed: '失败' }
+  return map[props.status] || props.status
+})
+
+const badgeColor = computed(() => {
+  const map: Record<string, string> = { running: 'blue', completed: 'green', failed: 'red' }
+  return map[props.status] || false
+})
 </script>
 
 <template>
@@ -62,6 +72,6 @@ function onClick() {
       {{ status === 'running' ? `Running ${Math.round(progress * 100)}%` : 'Run Backtest' }}
     </button>
 
-    <StatusBadge :status="status === 'running' ? 'running' : status === 'completed' ? 'completed' : status === 'failed' ? 'failed' : 'idle'" />
+    <DisplayBadge v-if="status !== 'idle'" :text="badgeText" variant="solid" :color="badgeColor" />
   </div>
 </template>

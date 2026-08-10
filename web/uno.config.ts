@@ -7,6 +7,7 @@ import {
   transformerDirectives,
   transformerVariantGroup,
 } from 'unocss'
+import { presetAnthonyDesign } from '@antfu/design/unocss'
 
 export default defineConfig({
   theme: {
@@ -25,31 +26,13 @@ export default defineConfig({
     },
   },
   shortcuts: [
-    // 中性基础
-    ['color-base', 'color-neutral-800 dark:color-neutral-200'],
-    ['bg-base', 'bg-white dark:bg-#111'],
-    ['bg-secondary', 'bg-#eee dark:bg-#222'],
-    ['border-base', 'border-#8882'],
-
-    // 激活态
-    ['bg-active', 'bg-#8881'],
-    ['color-active', 'color-primary-600 dark:color-primary-300'],
-    ['border-active', 'border-primary-600/25 dark:border-primary-400/25'],
-
-    // 动作
-    ['btn-action', 'inline-flex items-center gap-2 rounded border border-base px2 py1 op75 hover:op100 hover:bg-active disabled:pointer-events-none disabled:op30!'],
-
-    // 层级
-    ['z-top-nav', 'z-60'],
-    ['z-panel-content', 'z-70'],
+    // z-index 命名层（preset 拦截裸 z-index，app 自行定义）
+    ['z-top-nav', 'z-[60]'],
+    ['z-panel-content', 'z-[70]'],
     ['z-particle', 'z-0'],
     ['z-glow', 'z-1'],
 
-    // 透明度
-    ['op-fade', 'op65 dark:op55'],
-    ['op-mute', 'op30 dark:op25'],
-
-    // Shell
+    // 项目特有 shortcuts（通用 token 由 presetAnthonyDesign 提供）
     ['app-shell', 'w-screen h-screen flex flex-col of-hidden bg-base color-base font-sans'],
     ['h-nav', 'h-10'],
     ['h-tabs', 'h-8'],
@@ -58,13 +41,17 @@ export default defineConfig({
     ['scroll-touch', '[-webkit-overflow-scrolling:touch] [overscroll-behavior:contain]'],
   ],
   presets: [
+    presetAnthonyDesign({
+      primary: '#49833E',
+      darkBackground: '#111',
+    }),
     presetWind4(),
     presetIcons({ scale: 1.2 }),
     presetWebFonts({
       fonts: {
         sans: 'DM Sans:200,400,700',
         mono: 'DM Mono:400,500',
-        sc: 'Noto Sans SC:300,400,700',
+        cjk: 'Noto Sans SC:300,400,700',
       },
       processors: createLocalFontProcessor({
         fontAssetsDir: './public/assets/fonts',

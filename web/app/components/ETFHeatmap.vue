@@ -3,6 +3,7 @@ import { shallowRef, watch, onMounted, onUnmounted, nextTick } from '#imports'
 import * as echarts from 'echarts'
 import type { EChartsOption } from 'echarts'
 import { useETFData } from '../composables/useETFData'
+import type { ETF } from '../types/etf'
 
 const { etfs, fetchAll } = useETFData()
 const containerRef = shallowRef<HTMLElement | null>(null)
@@ -38,7 +39,7 @@ function buildOption(): EChartsOption {
   return {
     tooltip: {
       position: 'top',
-      formatter: (params: any) => {
+      formatter: (params: { data?: { etf?: ETF } }) => {
         const etf = params.data?.etf
         if (!etf) return ''
         return `${etf.code} ${etf.name}<br/>${etf.latest_close.toFixed(3)}<br/>涨跌: ${etf.change_pct > 0 ? '+' : ''}${etf.change_pct.toFixed(2)}%`
@@ -53,14 +54,14 @@ function buildOption(): EChartsOption {
     xAxis: {
       type: 'category',
       data: xAxisLabels,
-      axisLabel: { fontSize: 9, color: '#8888', rotate: 45 },
+      axisLabel: { fontSize: 9, color: '#888888', rotate: 45 },
       position: 'bottom',
       splitArea: { show: true },
     },
     yAxis: {
       type: 'category',
       data: yLabels,
-      axisLabel: { fontSize: 10, color: '#8888' },
+      axisLabel: { fontSize: 10, color: '#888888' },
       splitArea: { show: true },
     },
     visualMap: {
@@ -74,7 +75,7 @@ function buildOption(): EChartsOption {
         color: ['#cf1322', '#f5f5f5', '#49833E'],
       },
       text: ['涨', '跌'],
-      textStyle: { color: '#8888', fontSize: 10 },
+      textStyle: { color: '#888888', fontSize: 10 },
     },
     series: [
       {
@@ -83,9 +84,9 @@ function buildOption(): EChartsOption {
         label: {
           show: true,
           fontSize: 10,
-          color: '#8888',
+          color: '#888888',
           fontFamily: 'DM Mono',
-          formatter: (params: any) => {
+          formatter: (params: { data?: { etf?: ETF } }) => {
             const etf = params.data?.etf
             if (!etf || etf.change_pct == null) return ''
             return `${etf.change_pct > 0 ? '+' : ''}${etf.change_pct.toFixed(1)}%`
@@ -141,8 +142,8 @@ onUnmounted(() => {
       <p class="text-xs op-fade">加载 ETF 数据中...</p>
     </div>
     <div
-      ref="containerRef"
       v-else
+      ref="containerRef"
       class="border border-base rounded w-full"
       style="height: 300px"
     />

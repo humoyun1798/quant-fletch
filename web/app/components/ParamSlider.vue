@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { computed } from '#imports'
-
 interface Props {
   label: string
   description?: string
@@ -10,7 +8,7 @@ interface Props {
   modelValue: number
 }
 
-const props = withDefaults(defineProps<Props>(), {
+withDefaults(defineProps<Props>(), {
   step: 1,
   description: '',
 })
@@ -20,11 +18,6 @@ interface Emits {
 }
 
 const emit = defineEmits<Emits>()
-
-const pct = computed(() => {
-  if (props.max === props.min) return 0
-  return ((props.modelValue - props.min) / (props.max - props.min)) * 100
-})
 
 function onInput(e: Event) {
   const val = Number((e.target as HTMLInputElement).value)
@@ -45,8 +38,7 @@ function onInput(e: Event) {
         :max="max"
         :step="step"
         :value="modelValue"
-        class="w-full h-1.5 rounded appearance-none bg-#8882 cursor-pointer"
-        style="accent-color: #49833E;"
+        class="w-full h-1.5 rounded appearance-none bg-active cursor-pointer accent-primary"
         @input="onInput"
       >
     </div>

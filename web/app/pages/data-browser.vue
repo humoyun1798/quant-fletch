@@ -1,71 +1,107 @@
 <script setup lang="ts">
-import { shallowRef, onMounted } from '#imports'
+import { shallowRef, computed, onMounted } from '#imports'
 import { useETFData } from '../composables/useETFData'
 import { useMotion } from '../composables/useMotion'
-import type { Bar, BarPeriod, ETF } from '../types/etf'
-import ETFPicker from '../components/ETFPicker.vue'
+import FormCombobox from '@antfu/design/components/Form/FormCombobox.vue'
+import type { ComboboxOption } from '@antfu/design/components/Form/FormCombobox.vue'
+import LayoutDataTable from '@antfu/design/components/Layout/LayoutDataTable.vue'
+import type { Column } from '@antfu/design/components/Layout/LayoutDataTable.vue'
+import LayoutToolbar from '@antfu/design/components/Layout/LayoutToolbar.vue'
+import LayoutSplitPane from '@antfu/design/components/Layout/LayoutSplitPane.vue'
+import { Pane } from 'splitpanes'
 import KlineChart from '../components/KlineChart.vue'
-import OHLCVTable from '../components/OHLCVTable.vue'
 
-const { fetchBars } = useETFData()
-const { staggerList } = useMotion()
+const { etfs, ohlcv, fetchOHLCV, fetchAll } = useETFData()
+const { staggerList, safeGsap } = useMotion()
 
-const selectedCode = shallowRef<string | null>(null)
-const barData = shallowRef<Bar[]>([])
-const period = shallowRef<BarPeriod>('daily')
+const selectedCode = shallowRef<string>('')
+const loading = shallowRef(false)
 
-const periodOptions: { label: string; value: BarPeriod }[] = [
-  { label: '日线', value: 'daily' },
-  { label: '60m', value: '60m' },
-  { label: '30m', value: '30m' },
-  { label: '15m', value: '15m' },
-  { label: '5m', value: '5m' },
-  { label: '1m', value: '1m' },
+const ohlcvColumns: Column[] = [
+  { key: 'date', label: 'Date', width: '100px' },
+  { key: 'open', label: 'Open', align: 'right', sortable: true },
+  { key: 'high', label: 'High', align: 'right', sortable: true },
+  { key: 'low', label: 'Low', align: 'right', sortable: true },
+  { key: 'close', label: 'Close', align: 'right', sortable: true },
+  { key: 'volume', label: 'Volume', align: 'right', sortable: true },
 ]
 
 onMounted(() => {
-  staggerList('.data-grid > *')
+  fetchAll()
 })
 
-async function fetchData() {
-  if (!selectedCode.value) return
-  const data = await fetchBars(selectedCode.value, period.value)
-  if (data) barData.value = data
+const etfOptions = computed<ComboboxOption[]>(() =>
+  etfs.value.map(e => ({
+    value: e.code,
+    label: `${e.code}  ${e.name}`,
+  })),
+)
+
+function dateRange() {
+  const end = new Date()
+  const start = new Date()
+  start.setDate(start.getDate() - 365)
+  return {
+    start: start.toISOString().slice(0, 10),
+    end: end.toISOString().slice(0, 10),
+  }
 }
 
-async function onSelect(etf: ETF) {
-  selectedCode.value = etf.code
-  await fetchData()
-}
-
-async function onPeriodChange(p: BarPeriod) {
-  period.value = p
-  await fetchData()
+async function onSelect(code: string) {
+  if (!code || code === selectedCode.value) return
+  selectedCode.value = code
+  loading.value = true
+  const range = dateRange()
+  await fetchOHLCV(code, range.start, range.end)
+  loading.value = false
+  safeGsap(() => {
+    staggerList('.data-grid > *')
+    return undefined
+  })
 }
 </script>
 
 <template>
-  <div class="data-grid flex-1 overflow-y-auto scroll-touch">
-    <section class="p-3 border-b border-base">
-      <h2 class="text-sm font-medium color-base mb-2">Data Browser</h2>
-      <div class="flex items-center gap-1 mb-3">
-        <button
-          v-for="opt in periodOptions"
-          :key="opt.value"
-          class="px-2 py-0.5 text-xs rounded border transition-colors duration-150 font-mono tabular-nums min-w-[32px] min-h-[24px]"
-          :class="period === opt.value ? 'border-active color-active bg-active' : 'border-base op-fade hover:op100 hover:bg-active'"
-          @click="onPeriodChange(opt.value)"
-        >
-          {{ opt.label }}
-        </button>
+  <div class="data-grid flex-1 overflow-y-auto scroll-touch flex flex-col">
+    <LayoutToolbar>
+      <template #start>
+        <h2 class="text-sm font-medium color-base shrink-0">Data Browser</h2>
+        <FormCombobox
+          :options="etfOptions"
+          :model-value="selectedCode"
+          placeholder="搜索 ETF 代码或名称..."
+          @update:model-value="onSelect"
+          class="w-72"
+        />
+      </template>
+    </LayoutToolbar>
+
+    <LayoutSplitPane horizontal storage-key="data-browser-split" class="flex-1">
+      <Pane :size="40" :min-size="20">
+      <div class="min-h-[256px] h-full">
+        <KlineChart :data="ohlcv" />
       </div>
-      <div class="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-3">
-        <ETFPicker :model-value="selectedCode" @select="onSelect" />
-        <div>
-          <KlineChart :data="barData" :period="period" />
-          <OHLCVTable :data="barData" class="mt-3" />
+      </Pane>
+      <Pane :size="60" :min-size="20">
+      <div class="min-h-[128px] h-full">
+        <div v-if="ohlcv.length === 0" class="text-xs op-fade py-4 text-center">
+          选择 ETF 查看数据
         </div>
+        <LayoutDataTable
+          v-else
+          :columns="ohlcvColumns"
+          :rows="ohlcv"
+          manual-sort
+          class="max-h-full overflow-auto"
+        >
+          <template #cell="{ row, column, value }">
+            <span v-if="column.key === 'date'" class="font-mono tabular-nums">{{ String(value).slice(0, 10) }}</span>
+            <span v-else-if="column.key === 'volume'" class="font-mono tabular-nums">{{ (value as number).toLocaleString() }}</span>
+            <span v-else class="font-mono tabular-nums">{{ (value as number).toFixed(3) }}</span>
+          </template>
+        </LayoutDataTable>
       </div>
-    </section>
+      </Pane>
+    </LayoutSplitPane>
   </div>
 </template>

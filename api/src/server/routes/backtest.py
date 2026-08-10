@@ -5,7 +5,7 @@
 import asyncio
 import logging
 import uuid
-from datetime import date, datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
@@ -64,13 +64,12 @@ async def start_backtest(body: dict[str, Any]) -> dict[str, Any]:
                     'message': f"{pd_.name} 必须在 {pd_.min} ~ {pd_.max} 之间",
                     'code': 'out_of_range',
                 })
-        if pd_.type == 'choice' and pd_.choices:
-            if val not in pd_.choices:
-                errors.append({
-                    'field': pd_.name,
-                    'message': f"{pd_.name} 必须是 {pd_.choices} 之一",
-                    'code': 'invalid_choice',
-                })
+        if pd_.type == 'choice' and pd_.choices and val not in pd_.choices:
+            errors.append({
+                'field': pd_.name,
+                'message': f"{pd_.name} 必须是 {pd_.choices} 之一",
+                'code': 'invalid_choice',
+            })
 
     if errors:
         raise HTTPException(
@@ -221,7 +220,7 @@ async def _save_to_pg(
                         run_id, strategy_name, params,
                         start_date_str, end_date_str, status,
                         {'metrics': metrics, 'equity_curve': equity_curve, 'error': error},
-                        datetime.now(timezone.utc),
+                        datetime.now(UTC),
                     ),
                 )
             conn.commit()
@@ -333,8 +332,8 @@ async def _run_backtest(
             'start_date': start_date_str,
             'end_date': end_date_str,
             'result': result,
-            'created_at': dt.datetime.now(dt.timezone.utc).isoformat(),
-            'finished_at': dt.datetime.now(dt.timezone.utc).isoformat(),
+            'created_at': dt.datetime.now(dt.UTC).isoformat(),
+            'finished_at': dt.datetime.now(dt.UTC).isoformat(),
         }
 
         # 持久化到 PostgreSQL
@@ -479,45 +478,87 @@ def _run_single_backtest(
     }
 
 
-# ── Phase 2.3: Grid Search 参数优化 ──────────────────────────────────────────
+# ── Phase 2.3 / Phase 4e: 参数优化 (Grid Search + Optuna TPE) ────────────────
 
 
 @router.post('/backtest/optimize')
 async def optimize_backtest(body: dict[str, Any]) -> dict[str, Any]:
-    """参数网格搜索, 返回最优参数 + 完整 grid 结果
+    """参数优化 (Grid Search 或 Optuna TPE 贝叶斯优化)
 
     Body:
         strategy: 策略名
-        param_grid: {lookback: [20, 60, 120], top_n: [3, 5, 10]}
+        param_grid: {lookback: [20, 60, 120], top_n: [3, 5, 10]}  (grid 模式必填)
+        param_space: {lookback: {min:10, max:250, type:'int'}, ...} (optuna 模式必填)
+        optimizer: 'grid' (默认) | 'optuna'
         objective: 'sharpe' | 'total_return' | 'max_drawdown'
+        n_trials: Optuna 试验次数 (默认 30)
         start_date, end_date, benchmark
     """
     strategy_name = body.get('strategy', '')
-    param_grid: dict[str, list] = body.get('param_grid', {})
+    optimizer = body.get('optimizer', 'grid')
     objective = body.get('objective', 'sharpe')
     start_date_str = body.get('start_date', '2020-01-01')
     end_date_str = body.get('end_date', '2025-12-31')
     benchmark = body.get('benchmark', '510300.SH')
 
-    if not strategy_name or not param_grid:
+    if not strategy_name:
         raise HTTPException(status_code=422, detail={
-            'error': {'code': 'validation_error', 'message': 'strategy 和 param_grid 为必填'},
+            'error': {'code': 'validation_error', 'message': 'strategy 为必填'},
         })
 
-    # 生成参数组合 (笛卡尔积)
+    if optimizer == 'optuna':
+        param_space = body.get('param_space')
+        if not param_space:
+            raise HTTPException(status_code=422, detail={
+                'error': {
+                    'code': 'validation_error',
+                    'message': 'optuna 模式需要 param_space',
+                },
+            })
+        n_trials = body.get('n_trials', 30)
+        return await _optuna_optimize(
+            strategy_name, param_space, objective,
+            start_date_str, end_date_str, benchmark, n_trials,
+        )
+
+    # 默认: Grid Search
+    param_grid: dict[str, list] = body.get('param_grid', {})
+    if not param_grid:
+        raise HTTPException(status_code=422, detail={
+            'error': {
+                'code': 'validation_error',
+                'message': 'grid 模式需要 param_grid',
+            },
+        })
+    return await _grid_optimize(
+        strategy_name, param_grid, objective,
+        start_date_str, end_date_str, benchmark,
+    )
+
+
+async def _grid_optimize(
+    strategy_name: str, param_grid: dict[str, list],
+    objective: str, start_date_str: str, end_date_str: str, benchmark: str,
+) -> dict[str, Any]:
+    """Grid Search 参数优化 (原有逻辑, 保持向后兼容)"""
     import itertools
+
     keys = list(param_grid.keys())
     combinations = list(itertools.product(*param_grid.values()))
-    param_sets = [dict(zip(keys, combo)) for combo in combinations]
+    param_sets = [dict(zip(keys, combo, strict=False)) for combo in combinations]
 
-    # ponytail: 限制组合数防止爆炸, > 50 时改用贝叶斯优化
     if len(param_sets) > 50:
         raise HTTPException(status_code=422, detail={
-            'error': {'code': 'validation_error', 'message': f'参数组合数 {len(param_sets)} 超过上限 50, 请缩小 grid'},
+            'error': {
+                'code': 'validation_error',
+                'message': (
+                    f'参数组合数 {len(param_sets)} 超过上限 50, '
+                    '请缩小 grid 或使用 optimizer=optuna'
+                ),
+            },
         })
 
-    # 并行运行所有参数组合
-    async def _run_grid_item(item: dict) -> dict[str, Any]:
+    async def _run_item(item: dict) -> dict[str, Any]:
         try:
             result = await asyncio.to_thread(
                 _run_single_backtest,
@@ -527,11 +568,10 @@ async def optimize_backtest(body: dict[str, Any]) -> dict[str, Any]:
         except Exception as e:
             return {'params': item, 'error': str(e), 'metrics': {}}
 
-    tasks = [_run_grid_item(ps) for ps in param_sets]
+    tasks = [_run_item(ps) for ps in param_sets]
     grid_results = await asyncio.gather(*tasks)
 
-    # 按优化目标排序
-    reverse = objective != 'max_drawdown'  # drawdown 越小越好
+    reverse = objective != 'max_drawdown'
     sorted_results = sorted(
         grid_results,
         key=lambda r: r.get('metrics', {}).get(objective, -999),
@@ -539,14 +579,105 @@ async def optimize_backtest(body: dict[str, Any]) -> dict[str, Any]:
     )
 
     best = sorted_results[0] if sorted_results else {}
-
     return {
         'data': {
             'strategy': strategy_name,
+            'optimizer': 'grid',
             'objective': objective,
             'best_params': best.get('params', {}),
             'best_metrics': best.get('metrics', {}),
             'grid_results': sorted_results,
             'total_combinations': len(grid_results),
+        },
+    }
+
+
+async def _optuna_optimize(
+    strategy_name: str, param_space: dict[str, Any],
+    objective: str, start_date_str: str, end_date_str: str,
+    benchmark: str, n_trials: int,
+) -> dict[str, Any]:
+    """Optuna TPE 贝叶斯参数优化。
+
+    param_space 格式:
+      {param_name: {min, max, type: 'int'|'float'|'choice', choices?: [...]}}
+
+    ponytail: TPE 采样器比 Grid Search 少 3-10× 试验数达到同等最优,
+    当需要多目标优化时切换到 optuna.samplers.NSGAIISampler.
+    """
+    import optuna
+    from optuna.samplers import TPESampler
+
+    def _objective(trial: optuna.Trial) -> float:
+        params: dict[str, Any] = {}
+        for name, spec in param_space.items():
+            ptype = spec.get('type', 'float')
+            if ptype == 'choice' and 'choices' in spec:
+                params[name] = trial.suggest_categorical(name, spec['choices'])
+            elif ptype == 'int':
+                params[name] = trial.suggest_int(
+                    name,
+                    int(spec.get('min', 1)),
+                    int(spec.get('max', 250)),
+                )
+            else:  # float
+                params[name] = trial.suggest_float(
+                    name,
+                    float(spec.get('min', 0)),
+                    float(spec.get('max', 1)),
+                )
+
+        try:
+            bt_result = _run_single_backtest(
+                strategy_name, params, start_date_str, end_date_str, benchmark,
+            )
+            metrics = bt_result.get('metrics', {})
+            val = metrics.get(objective, -999)
+            return float(val) if val is not None else -999.0
+        except Exception:
+            return -999.0
+
+    # TPE sampler: 用已完成试验的结果建模后验分布
+    study = optuna.create_study(
+        direction='minimize' if objective == 'max_drawdown' else 'maximize',
+        sampler=TPESampler(seed=42),
+    )
+
+    # ponytail: to_thread 让 Optuna 在后台线程运行, 不阻塞事件循环
+    await asyncio.to_thread(
+        study.optimize, _objective, n_trials=n_trials, show_progress_bar=False,
+    )
+
+    best_params = study.best_params
+    best_value = study.best_value
+
+    # 用最优参数跑一次完整回测取 metrics
+    best_result = await asyncio.to_thread(
+        _run_single_backtest,
+        strategy_name, best_params, start_date_str, end_date_str, benchmark,
+    )
+
+    # 收集 trial 历史
+    trials_data = [
+        {
+            'number': t.number,
+            'params': t.params,
+            'value': t.value,
+            'state': str(t.state),
+        }
+        for t in study.trials
+        if t.state.name == 'COMPLETE'
+    ]
+
+    return {
+        'data': {
+            'strategy': strategy_name,
+            'optimizer': 'optuna',
+            'objective': objective,
+            'n_trials': n_trials,
+            'best_params': best_params,
+            'best_metrics': best_result.get('metrics', {}),
+            'best_value': best_value,
+            'trials': trials_data,
         },
     }

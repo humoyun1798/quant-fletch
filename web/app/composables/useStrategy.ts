@@ -1,16 +1,17 @@
 // @env browser
-import { shallowRef } from '#imports'
+// 策略管理 — 模块级单例，所有组件共享策略列表和选中状态
+// 依据: 07-前端设计.md §Composable 设计
+import { $fetch } from '#build/fetch.mjs'
+import { ref, shallowRef } from '#imports'
 import type { StrategyMeta } from '../types/strategy'
 
-// 模块级单例 — 所有组件共享同一份策略列表和选中状态
 const strategies = shallowRef<StrategyMeta[]>([])
-const selected = shallowRef<string | null>(null)
-const params = shallowRef<Record<string, any>>({})
+const selected = ref<string | null>(null)
+const params = shallowRef<Record<string, number | string>>({})
 let _pending: Promise<void> | null = null
 
 export function useStrategy() {
   async function fetchAll() {
-    // 去重 guard — 同时调多次只发一次请求
     if (_pending) return _pending
     _pending = (async () => {
       try {
@@ -36,5 +37,10 @@ export function useStrategy() {
     )
   }
 
-  return { strategies, selected, params, fetchAll, selectStrategy }
+  function updateParam(key: string, value: number | string) {
+    if (params.value[key] === value) return
+    params.value = { ...params.value, [key]: value }
+  }
+
+  return { strategies, selected, params, fetchAll, selectStrategy, updateParam }
 }

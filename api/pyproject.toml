@@ -15,6 +15,8 @@ dependencies = [
     "websockets>=14.0",
     "pydantic>=2.0.0",
     "httpx>=0.28.0",
+    "numpy>=2.0.0",
+    "optuna>=4.0.0",
 ]
 
 [project.optional-dependencies]
@@ -54,4 +56,13 @@ markers = [
     "unit: Unit tests",
     "integration: Integration tests",
     "slow: Slow tests (backtest, E2E, full pipeline)",
+]
+
+[dependency-groups]
+dev = [
+    "bandit>=1.9.4",
+    "black>=26.5.1",
+    "isort>=8.0.1",
+    "mypy>=2.3.0",
+    "ruff>=0.16.1",
 ]

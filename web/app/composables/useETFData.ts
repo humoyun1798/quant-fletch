@@ -1,11 +1,15 @@
 // @env browser
-// fetch from Nuxt proxy → FastAPI, error handling inline
-import { shallowRef } from '#imports'
-import type { ETF, OHLCV, Bar, BarPeriod } from '../types/etf'
+// ETF 数据获取 — fetch from Nuxt proxy → FastAPI
+// 依据: 07-前端设计.md §Composable 设计
+import { $fetch } from '#build/fetch.mjs'
+import { ref, shallowRef } from '#imports'
+import type { Bar, BarPeriod, ETF, OHLCV } from '../types/etf'
 
 export function useETFData() {
   const etfs = shallowRef<ETF[]>([])
-  const loading = shallowRef(false)
+  const ohlcv = shallowRef<OHLCV[]>([])
+  const bars = shallowRef<Bar[]>([])
+  const loading = ref(false)
   const error = shallowRef<string | null>(null)
 
   async function fetchAll() {
@@ -15,8 +19,9 @@ export function useETFData() {
       const res = await $fetch<{ data: ETF[] }>('/api/v1/etfs')
       etfs.value = res.data
     }
-    catch (e: any) {
-      error.value = e?.message ?? '获取 ETF 列表失败'
+    catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : '获取 ETF 列表失败'
+      error.value = msg
     }
     finally {
       loading.value = false
@@ -30,10 +35,13 @@ export function useETFData() {
       const res = await $fetch<{ data: OHLCV[] }>(`/api/v1/etfs/${code}/ohlcv`, {
         query: { start, end },
       })
+      ohlcv.value = res.data
       return res.data
     }
-    catch (e: any) {
-      error.value = e?.message ?? '获取 K 线数据失败'
+    catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : '获取 K 线数据失败'
+      error.value = msg
+      ohlcv.value = []
       return []
     }
     finally {
@@ -48,10 +56,13 @@ export function useETFData() {
       const res = await $fetch<{ data: Bar[] }>(`/api/v1/etfs/${code}/bars`, {
         query: { period },
       })
+      bars.value = res.data
       return res.data
     }
-    catch (e: any) {
-      error.value = e?.message ?? '获取 K 线数据失败'
+    catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : '获取 K 线数据失败'
+      error.value = msg
+      bars.value = []
       return []
     }
     finally {
@@ -59,5 +70,5 @@ export function useETFData() {
     }
   }
 
-  return { etfs, loading, error, fetchAll, fetchOHLCV, fetchBars }
+  return { etfs, ohlcv, bars, loading, error, fetchAll, fetchOHLCV, fetchBars }
 }

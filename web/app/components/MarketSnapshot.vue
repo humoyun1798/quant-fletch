@@ -1,75 +1,94 @@
 <script setup lang="ts">
-import { shallowRef, onMounted, watch } from '#imports'
+import { computed, shallowRef, onMounted } from '#imports'
 import { useETFData } from '../composables/useETFData'
-import { useMotion } from '../composables/useMotion'
-import LoadingSkeleton from './LoadingSkeleton.vue'
-import ErrorAlert from './ErrorAlert.vue'
+import FeedbackSkeleton from '@antfu/design/components/Feedback/FeedbackSkeleton.vue'
+import FeedbackTip from '@antfu/design/components/Feedback/FeedbackTip.vue'
+import DisplayNumber from '@antfu/design/components/Display/DisplayNumber.vue'
+import DisplayDate from '@antfu/design/components/Display/DisplayDate.vue'
+import DisplayProportionBar from '@antfu/design/components/Display/DisplayProportionBar.vue'
+import LayoutCard from '@antfu/design/components/Layout/LayoutCard.vue'
+import type { ProportionSegment } from '@antfu/design/components/Display/DisplayProportionBar.vue'
 
 const { etfs, loading, error, fetchAll } = useETFData()
-const { staggerList, safeGsap } = useMotion()
-const data = shallowRef<any[]>([])
-const gridRef = shallowRef<HTMLElement>()
+const mounted = shallowRef(false)
 
 onMounted(async () => {
   await fetchAll()
-  data.value = etfs.value
+  mounted.value = true
 })
 
-// 数据加载完成后 stagger 入场
-watch(data, (val) => {
-  if (!val || val.length === 0) return
-  safeGsap(() => {
-    if (gridRef.value) {
-      staggerList(gridRef.value.querySelectorAll('.etf-card'))
-    }
-    return undefined
-  })
+const total = computed(() => etfs.value.length)
+const hasData = computed(() => etfs.value.filter(e => e.latest_close != null).length)
+const latestDate = computed(() => {
+  const dates = etfs.value
+    .map(e => e.latest_date)
+    .filter((d): d is string => d != null)
+    .sort()
+  return dates.length > 0 ? dates[dates.length - 1] : null
 })
 
-// A 股涨跌色
-function changeClass(val: number) {
-  if (val > 0) return 'color-#EF4444'
-  if (val < 0) return 'color-#22C45D'
-  return 'op-fade'
-}
+const upCount = computed(() => etfs.value.filter(e => (e.change_pct ?? 0) > 0).length)
+const downCount = computed(() => etfs.value.filter(e => (e.change_pct ?? 0) < 0).length)
+const flatCount = computed(() => etfs.value.filter(e => (e.change_pct ?? 0) === 0).length)
+
+const proportionSegments = computed<ProportionSegment[]>(() => [
+  { value: upCount.value, label: '上涨', color: '#EF4444' },
+  { value: downCount.value, label: '下跌', color: '#22C45D' },
+  { value: flatCount.value, label: '平盘', color: '#888888' },
+])
 </script>
 
 <template>
-  <section class="p-3 border-b border-base">
-    <div class="flex items-center gap-2 mb-2">
-      <h2 class="text-sm font-medium color-base">Market Snapshot</h2>
-      <span class="text-micro op-mute font-mono tabular-nums">
-        {{ data.length }} ETFs
-      </span>
+  <LayoutCard class="mb-3">
+    <h2 class="text-sm font-medium color-base mb-2">Market Snapshot</h2>
+
+    <FeedbackSkeleton v-if="loading" variant="text" :lines="3" />
+    <div v-else-if="error" class="flex items-start gap-2">
+      <FeedbackTip type="error" class="flex-1">{{ error }}</FeedbackTip>
+      <button class="btn-action text-sm shrink-0" @click="fetchAll()">
+        <span class="i-ph-arrow-clockwise-duotone" />重试
+      </button>
     </div>
 
-    <LoadingSkeleton v-if="loading" :rows="3" type="table" />
-    <ErrorAlert v-else-if="error" :message="error" @retry="fetchAll()" />
-
-    <div v-else ref="gridRef" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2">
-      <div
-        v-for="etf in data.slice(0, 12)"
-        :key="etf.code"
-        class="etf-card px-2 py-1.5 border border-base rounded text-xs"
-      >
-        <div class="flex items-center justify-between mb-0.5">
-          <span class="font-mono op-fade truncate" :title="etf.code">
-            {{ etf.code }}
-          </span>
-          <span class="text-micro px-1 py-px rounded border op-mute uppercase tracking-wide">
-            {{ etf.type }}
+    <div v-else class="space-y-3">
+      <!-- 顶栏：总数 + 日期 -->
+      <div class="flex items-center justify-between">
+        <div class="flex items-baseline gap-1.5">
+          <DisplayNumber :value="hasData" class="text-lg font-medium" />
+          <span class="text-xs op-fade">
+            / <DisplayNumber :value="total" class="text-xs" /> ETFs
           </span>
         </div>
-        <p class="truncate text-xs">{{ etf.name }}</p>
-        <div class="flex items-baseline gap-1.5 mt-1">
-          <span class="font-mono tabular-nums text-sm">
-            {{ etf.latest_close }}
-          </span>
-          <span class="font-mono tabular-nums text-micro" :class="changeClass(etf.change_pct)">
-            {{ etf.change_pct > 0 ? '+' : '' }}{{ etf.change_pct.toFixed(2) }}%
-          </span>
+        <DisplayDate
+          v-if="latestDate"
+          :date="latestDate"
+          live
+          colorize
+          class="text-xs op-mute font-mono tabular-nums"
+        />
+      </div>
+
+      <!-- 涨跌统计 -->
+      <div class="flex items-center gap-4 text-xs">
+        <div class="flex items-center gap-1">
+          <span class="w-2 h-2 rounded-full bg-#EF4444 shrink-0" />
+          <span class="op-fade">上涨</span>
+          <DisplayNumber :value="upCount" class="font-medium" />
+        </div>
+        <div class="flex items-center gap-1">
+          <span class="w-2 h-2 rounded-full bg-#22C45D shrink-0" />
+          <span class="op-fade">下跌</span>
+          <DisplayNumber :value="downCount" class="font-medium" />
+        </div>
+        <div v-if="flatCount > 0" class="flex items-center gap-1">
+          <span class="w-2 h-2 rounded-full border border-base shrink-0" />
+          <span class="op-fade">平盘</span>
+          <DisplayNumber :value="flatCount" />
         </div>
       </div>
+
+      <!-- 涨跌比 -->
+      <DisplayProportionBar :segments="proportionSegments" :height="10" />
     </div>
-  </section>
+  </LayoutCard>
 </template>

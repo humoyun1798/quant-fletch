@@ -1,7 +1,13 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { useStrategy } from '../../app/composables/useStrategy'
+import type { StrategyMeta } from '../../app/types/strategy'
 
-const mockStrategies = [
+const mockFetch = vi.fn()
+vi.mock('#build/fetch.mjs', () => ({
+  $fetch: (...args: unknown[]) => mockFetch(...args),
+}))
+
+const mockStrategies: StrategyMeta[] = [
   {
     name: '双均线动量轮动',
     version: '1.0.0',
@@ -9,11 +15,11 @@ const mockStrategies = [
     description: '买入过去 N 日动量最强的 ETF',
     tags: ['动量', 'ETF'],
     min_bars: 60,
-    rebalance_freq: 'weekly' as const,
+    rebalance_freq: 'weekly',
     params: [
-      { name: 'lookback', default: 60, type: 'int' as const, min: 10, max: 250, description: '回看天数' },
-      { name: 'top_n', default: 5, type: 'int' as const, min: 1, max: 15, description: '持仓数' },
-      { name: 'rebalance', default: 'weekly', type: 'choice' as const, choices: ['daily', 'weekly', 'monthly'], description: '调仓频率' },
+      { name: 'lookback', default: 60, type: 'int', min: 10, max: 250, description: '回看天数' },
+      { name: 'top_n', default: 5, type: 'int', min: 1, max: 15, description: '持仓数' },
+      { name: 'rebalance', default: 'weekly', type: 'choice', choices: ['daily', 'weekly', 'monthly'], description: '调仓频率' },
     ],
     factors: [{ name: 'momentum', description: '动量因子', category: 'momentum' }],
   },
@@ -24,7 +30,7 @@ const mockStrategies = [
     description: '按波动率倒数分配权重',
     tags: ['风险平价', '波动率'],
     min_bars: 30,
-    rebalance_freq: 'monthly' as const,
+    rebalance_freq: 'monthly',
     params: [],
     factors: [],
   },
@@ -32,7 +38,7 @@ const mockStrategies = [
 
 describe('useStrategy', () => {
   beforeEach(() => {
-    vi.stubGlobal('$fetch', vi.fn())
+    mockFetch.mockReset()
     // Reset module state between tests
     const { strategies, selected, params } = useStrategy()
     strategies.value = []
@@ -48,7 +54,7 @@ describe('useStrategy', () => {
   })
 
   it('fetchAll populates strategies', async () => {
-    vi.stubGlobal('$fetch', vi.fn().mockResolvedValue({ data: mockStrategies }))
+    mockFetch.mockResolvedValue({ data: mockStrategies })
 
     const { strategies, fetchAll } = useStrategy()
     await fetchAll()
@@ -57,7 +63,7 @@ describe('useStrategy', () => {
   })
 
   it('fetchAll handles error gracefully', async () => {
-    vi.stubGlobal('$fetch', vi.fn().mockRejectedValue(new Error('Server error')))
+    mockFetch.mockRejectedValue(new Error('Server error'))
 
     const { strategies, fetchAll } = useStrategy()
     await fetchAll()
@@ -69,7 +75,7 @@ describe('useStrategy', () => {
   it('selectStrategy sets selected and builds default params', () => {
     // Pre-populate the module state
     const { strategies } = useStrategy()
-    strategies.value = mockStrategies as any
+    strategies.value = mockStrategies
 
     const { selected, params, selectStrategy } = useStrategy()
     selectStrategy('双均线动量轮动')

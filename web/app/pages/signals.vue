@@ -2,7 +2,7 @@
 import { useBacktest } from '../composables/useBacktest'
 import SignalSummary from '../components/SignalSummary.vue'
 import SignalTimeline from '../components/SignalTimeline.vue'
-import EmptyState from '../components/EmptyState.vue'
+import FeedbackEmptyState from '@antfu/design/components/Feedback/FeedbackEmptyState.vue'
 
 const backtest = useBacktest()
 </script>
@@ -15,19 +15,25 @@ const backtest = useBacktest()
     </template>
 
     <section v-else-if="backtest.status.value === 'running' || backtest.status.value === 'queued'" class="p-6">
-      <EmptyState
+      <FeedbackEmptyState
         icon="i-ph-circle-notch-duotone animate-spin"
         title="回测运行中"
-        :description="`${backtest.currentStep.value || 'preparing'} ${backtest.progress.value > 0 ? Math.round(backtest.progress.value * 100) + '%' : ''}`"
-      />
+      >
+        <template #hint>
+          {{ `${backtest.currentStep.value || 'preparing'} ${backtest.progress.value > 0 ? Math.round(backtest.progress.value * 100) + '%' : ''}` }}
+        </template>
+      </FeedbackEmptyState>
     </section>
 
     <section v-else class="p-6">
-      <EmptyState
+      <FeedbackEmptyState
         icon="i-ph-arrow-left-right-duotone"
         title="先跑回测，信号自动出现在这里"
-        description="切换到 Strategy 页运行回测，完成后返回此页查看全部调仓信号按时间线展示"
-      />
+      >
+        <template #hint>
+          切换到 Strategy 页运行回测，完成后返回此页查看全部调仓信号按时间线展示
+        </template>
+      </FeedbackEmptyState>
     </section>
   </div>
 </template>

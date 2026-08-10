@@ -7,6 +7,8 @@ export default defineConfig({
   resolve: {
     alias: {
       '#imports': resolve(__dirname, 'tests/mocks/imports.ts'),
+      '#build/fetch.mjs': resolve(__dirname, 'tests/mocks/fetch.ts'),
+      '#app/composables/router': resolve(__dirname, 'tests/mocks/imports.ts'),
       '@vueuse/core': resolve(__dirname, 'tests/mocks/vueuse.ts'),
     },
   },
