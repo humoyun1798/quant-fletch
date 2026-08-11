@@ -10,17 +10,18 @@
     "typecheck": "pnpm run -r typecheck",
     "prepare": "npx simple-git-hooks"
   },
+  "devDependencies": {
+    "@antfu/eslint-config": "catalog:dev",
+    "@unocss/nuxt": "catalog:unocss",
+    "@unocss/preset-web-fonts": "catalog:unocss",
+    "lint-staged": "catalog:dev",
+    "simple-git-hooks": "catalog:dev",
+    "typescript": "catalog:dev"
+  },
   "simple-git-hooks": {
     "pre-commit": "pnpm i --frozen-lockfile --ignore-scripts --offline && npx lint-staged"
   },
   "lint-staged": {
     "*": "eslint --fix"
-  },
-  "devDependencies": {
-    "@antfu/eslint-config": "catalog:dev",
-    "@unocss/nuxt": "^66.7.5",
-    "@unocss/preset-web-fonts": "^66.7.5",
-    "lint-staged": "catalog:dev",
-    "simple-git-hooks": "catalog:dev"
   }
 }

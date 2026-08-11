@@ -44,12 +44,11 @@ function buildOption(): EChartsOption {
   return {
     tooltip: {
       position: 'top',
-      // ECharts formatter type is overly strict — cast to any
       formatter: ((params: { data?: { etf?: ETF } }) => {
         const etf = params.data?.etf
         if (!etf) return ''
         return `${etf.code} ${etf.name}<br/>${(etf.latest_close ?? 0).toFixed(3)}<br/>涨跌: ${(etf.change_pct ?? 0) > 0 ? '+' : ''}${(etf.change_pct ?? 0).toFixed(2)}%`
-      }) as any,
+      }) as unknown as echarts.TooltipComponentFormatterCallback<unknown>,
     },
     grid: {
       left: 56,
@@ -84,11 +83,10 @@ function buildOption(): EChartsOption {
       text: ['涨', '跌'],
       textStyle: { color: '#888888', fontSize: 10 },
     },
-    // ECharts heatmap series type rejects custom data fields — cast to any
     series: [
       {
         type: 'heatmap',
-        data: heatData as any,
+        data: heatData as unknown as echarts.HeatmapSeriesOption['data'],
         label: {
           show: true,
           fontSize: 10,
@@ -98,13 +96,13 @@ function buildOption(): EChartsOption {
             const etf = params.data?.etf
             if (!etf || etf.change_pct == null) return ''
             return `${etf.change_pct > 0 ? '+' : ''}${etf.change_pct.toFixed(1)}%`
-          }) as any,
+          }) as unknown as echarts.TooltipComponentFormatterCallback<unknown>,
         },
         emphasis: {
           itemStyle: { shadowBlur: 10, shadowColor: 'rgba(0,0,0,0.3)' },
         },
       },
-    ] as any,
+    ] as unknown as echarts.SeriesOption[],
   }
 }
 

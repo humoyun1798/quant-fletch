@@ -41,7 +41,7 @@
     "nuxt-mcp-dev": "catalog:nuxt",
     "typescript": "^5.9.2",
     "unocss": "catalog:unocss",
-    "vitest": "^3.2.7",
+    "vitest": "catalog:test",
     "vue-tsc": "^3.3.9"
   }
 }

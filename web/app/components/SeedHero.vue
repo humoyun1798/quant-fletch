@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // SeedHero: 品牌展示 + 数字跑表
 // 依据: 迭代/v3/README.md Phase 3 §SeedHero
+import { setInterval } from '#app/compat/interval'
 import { shallowRef, watch, onMounted, onUnmounted, useNuxtApp } from '#imports'
 
 interface Props {
