@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { shallowRef, watch, onMounted, onUnmounted, nextTick } from '#imports'
+import { shallowRef, watch, onMounted, onUnmounted, nextTick, useNuxtApp } from '#imports'
 import { createChart } from 'lightweight-charts'
 import type { IChartApi, ISeriesApi, LineData, Time } from 'lightweight-charts'
 import { useChartTheme } from '../composables/useChartTheme'
+import { useMotion } from '../composables/useMotion'
 
 interface Props {
   data: Array<{ date: string, equity: number, benchmark: number }>
@@ -20,7 +21,12 @@ interface Emits {
 const emit = defineEmits<Emits>()
 
 const { chartColors } = useChartTheme()
+const { safeGsap } = useMotion()
+const { $gsap } = useNuxtApp()
+const gsap = $gsap!
+
 const containerRef = shallowRef<HTMLElement | null>(null)
+const shimmerRef = shallowRef<HTMLElement | null>(null)
 let chart: IChartApi | null = null
 let equityLine: ISeriesApi<'Line'> | null = null
 let benchmarkLine: ISeriesApi<'Line'> | null = null
@@ -102,6 +108,21 @@ function setData(items: Array<{ date: string, equity: number, benchmark: number 
   benchmarkLine.setData(benchmarkData)
   chart!.timeScale().fitContent()
   emit('ready')
+
+  // 光线绘制: 渐变色从左到右扫过图表
+  safeGsap(() => {
+    if (!shimmerRef.value || !gsap) return undefined
+    const tl = gsap.timeline()
+    tl.fromTo(shimmerRef.value,
+      { x: '-100%', opacity: 0.8 },
+      { x: '100%', duration: 0.8, ease: 'power2.inOut' },
+    )
+    tl.to(shimmerRef.value,
+      { opacity: 0, duration: 0.2, ease: 'power2.out' },
+      '-=0.1',
+    )
+    return undefined
+  })
 }
 
 watch(
@@ -128,7 +149,7 @@ onUnmounted(() => {
 <template>
   <section class="px-3 py-2">
     <h2 class="text-sm font-medium color-base mb-1">Equity Curve</h2>
-    <div class="border border-base rounded overflow-hidden">
+    <div class="border border-base rounded overflow-hidden relative">
       <div
         v-if="data.length === 0"
         class="flex flex-col items-center justify-center gap-2"
@@ -142,6 +163,12 @@ onUnmounted(() => {
         ref="containerRef"
         :style="{ height: `${height}px` }"
         class="w-full"
+      />
+      <!-- 光线扫过遮罩 -->
+      <div
+        ref="shimmerRef"
+        class="absolute inset-0 pointer-events-none"
+        style="background: linear-gradient(90deg, transparent 0%, rgba(124,188,113,0.12) 40%, rgba(124,188,113,0.25) 50%, rgba(124,188,113,0.12) 60%, transparent 100%);"
       />
     </div>
   </section>

@@ -2,6 +2,7 @@
 # 来源: 文档 05-回测引擎.md 第 12-57 行
 # ponytail: ~80 行核心 loop, 当需要分钟级回测时引入 event-driven 架构
 # ponytail: weekly = ISO week number 判断, monthly = 每月首个交易日调仓
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date
 import polars as pl
@@ -141,6 +142,7 @@ class SelfLoopBacktester:
         config: BacktestConfig,
         feature_service: FeatureService,
         calendar: TradeCalendar,
+        progress_callback: Callable[[float, str], None] | None = None,
     ) -> BacktestResult:
         trading_days = calendar.get_trading_days(config.start_date, config.end_date)
         if not trading_days:
@@ -159,7 +161,11 @@ class SelfLoopBacktester:
         last_rebalance_month: int | None = None   # ponytail: 月度调仓追踪
         last_rebalance_week: int | None = None    # ponytail: 周度调仓追踪, ISO week number
 
-        for day in trading_days:
+        n_days = len(trading_days)
+        # 每推进 ~5% 的交易日才回调一次，减少队列竞争
+        report_every = max(1, n_days // 20)
+
+        for i, day in enumerate(trading_days):
             day_date = day if isinstance(day, date) else date.fromisoformat(str(day))
             is_rebalance = self._is_rebalance_day(
                 strategy.meta.rebalance_freq, rebalance_counter,
@@ -188,6 +194,9 @@ class SelfLoopBacktester:
 
             portfolio.record_equity(day_date, cutoff)
             rebalance_counter += 1
+
+            if progress_callback and i % report_every == 0:
+                progress_callback(i / max(1, n_days - 1), 'running')
 
         # 计算绩效指标
         metrics = _calc_metrics(portfolio, config, trading_days)

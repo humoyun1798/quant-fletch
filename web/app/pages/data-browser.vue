@@ -47,7 +47,7 @@ function dateRange() {
   }
 }
 
-async function onSelect(code: string) {
+async function onSelect(code: string | undefined) {
   if (!code || code === selectedCode.value) return
   selectedCode.value = code
   loading.value = true
@@ -70,8 +70,8 @@ async function onSelect(code: string) {
           :options="etfOptions"
           :model-value="selectedCode"
           placeholder="搜索 ETF 代码或名称..."
-          @update:model-value="onSelect"
           class="w-72"
+          @update:model-value="onSelect"
         />
       </template>
     </LayoutToolbar>
@@ -94,7 +94,7 @@ async function onSelect(code: string) {
           manual-sort
           class="max-h-full overflow-auto"
         >
-          <template #cell="{ row, column, value }">
+          <template #cell="{ column, value }">
             <span v-if="column.key === 'date'" class="font-mono tabular-nums">{{ String(value).slice(0, 10) }}</span>
             <span v-else-if="column.key === 'volume'" class="font-mono tabular-nums">{{ (value as number).toLocaleString() }}</span>
             <span v-else class="font-mono tabular-nums">{{ (value as number).toFixed(3) }}</span>

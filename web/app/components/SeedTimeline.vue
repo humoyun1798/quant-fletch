@@ -66,7 +66,7 @@ const etfBlocks = computed(() => {
           <!-- 竖线连接线 -->
           <div
             v-if="i < stepDefs.length - 1"
-            class="absolute top-full w-0.5 h-6 bg-#8882"
+            class="absolute top-full w-0.5 h-6 bg-hover"
             :class="i < activeStepIdx ? 'bg-primary-400' : ''"
           />
           <!-- 圆点 -->
@@ -107,7 +107,7 @@ const etfBlocks = computed(() => {
             :class="{
               'border-primary-400/30 bg-primary-400/15': block.status === 'done',
               'border-primary-400 bg-primary-400/10 animate-pulse': block.status === 'fetching',
-              'border-#8882/30 bg-transparent': block.status === 'pending',
+              'border-pending bg-transparent': block.status === 'pending',
             }"
           >
             <span

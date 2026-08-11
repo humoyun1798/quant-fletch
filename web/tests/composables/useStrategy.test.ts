@@ -3,7 +3,7 @@ import { useStrategy } from '../../app/composables/useStrategy'
 import type { StrategyMeta } from '../../app/types/strategy'
 
 const mockFetch = vi.fn()
-vi.mock('#build/fetch.mjs', () => ({
+vi.mock('ofetch', () => ({
   $fetch: (...args: unknown[]) => mockFetch(...args),
 }))
 

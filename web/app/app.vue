@@ -15,6 +15,7 @@ const { pageEnter, pageLeave } = useMotion()
         @enter="pageEnter"
         @leave="pageLeave"
       >
+        <!-- eslint-disable-next-line vue/no-template-shadow, unimport/auto-insert -->
         <component :is="Component" :key="route.path" />
       </Transition>
     </NuxtPage>

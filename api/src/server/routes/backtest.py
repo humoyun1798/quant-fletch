@@ -3,9 +3,10 @@
 # ponytail: 结果双写 (内存 + PG backtest_run 表), 内存优先, PG 兜底
 # ponytail: 回测在 asyncio.to_thread 中同步运行, 当需要取消功能时引入 TaskGroup
 import asyncio
+import json
 import logging
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
@@ -13,6 +14,14 @@ from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix='/api/v1')
+
+
+def _json_serial(obj: Any) -> str:
+    """JSON encoder fallback: handle date/datetime/Decimal (ponytail: 最小可行序列化)"""
+    if isinstance(obj, (datetime, date)):
+        return obj.isoformat()
+    raise TypeError(f'Type {type(obj)} not serializable')
+
 
 # 内存存储 (ponytail: 重启丢失, PG backtest_run 表兜底)
 _run_store: dict[str, dict[str, Any]] = {}
@@ -176,7 +185,20 @@ async def backtest_ws(websocket: WebSocket, run_id: str) -> None:
     await websocket.accept()
 
     if run_id not in _progress_queues:
-        await websocket.send_json({'progress': 1.0, 'step': 'completed', 'run_id': run_id})
+        # 队列不存在：检查 run_store 确认状态
+        stored = _run_store.get(run_id)
+        if stored and stored['status'] == 'completed':
+            await websocket.send_json({'progress': 1.0, 'step': 'completed', 'run_id': run_id})
+        elif stored and stored['status'] == 'failed':
+            await websocket.send_json({
+                'progress': 1.0, 'step': 'failed', 'run_id': run_id,
+                'message': stored.get('error', {}).get('message', '回测执行失败'),
+            })
+        else:
+            await websocket.send_json({
+                'progress': 0.0, 'step': 'failed', 'run_id': run_id,
+                'message': '回测运行不存在或已过期',
+            })
         await websocket.close()
         return
 
@@ -217,9 +239,9 @@ async def _save_to_pg(
                            metrics = EXCLUDED.metrics,
                            finished_at = EXCLUDED.finished_at""",
                     (
-                        run_id, strategy_name, params,
+                        run_id, strategy_name, json.dumps(params, default=_json_serial),
                         start_date_str, end_date_str, status,
-                        {'metrics': metrics, 'equity_curve': equity_curve, 'error': error},
+                        json.dumps({'metrics': metrics, 'equity_curve': equity_curve, 'error': error}, default=_json_serial),
                         datetime.now(UTC),
                     ),
                 )
@@ -319,10 +341,20 @@ async def _run_backtest(
             await queue.put({'progress': 0.0, 'step': 'scoring'})
 
         # 同步回测在后台线程运行
-        # ponytail: 进度回调通过 asyncio.Queue 跨线程通信
+        # ponytail: 进度回调通过 run_coroutine_threadsafe 跨线程推入 asyncio Queue
+        loop = asyncio.get_running_loop()
+
+        def _on_progress(pct: float, step: str) -> None:
+            """线程安全进度回调"""
+            if queue:
+                asyncio.run_coroutine_threadsafe(
+                    queue.put({'progress': pct, 'step': step}), loop,
+                )
+
         result = await asyncio.to_thread(
             SelfLoopBacktester().run,
             strategy, config, feature_service, calendar,
+            _on_progress,
         )
 
         _run_store[run_id] = {

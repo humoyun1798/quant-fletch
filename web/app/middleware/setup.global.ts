@@ -6,7 +6,7 @@ export default defineNuxtRouteMiddleware(async (to) => {
 
   // 开发环境未启动后端时跳过检查，避免无限重定向
   try {
-    const { $fetch } = await import('#build/fetch.mjs')
+    const { $fetch } = await import('ofetch')
     const { data } = await $fetch<{ data: { status: string } }>('/api/v1/system/status')
     if (data.status !== 'ready') {
       return navigateTo('/setup')

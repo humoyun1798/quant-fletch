@@ -1,7 +1,7 @@
 // @env browser
 // ETF 数据获取 — fetch from Nuxt proxy → FastAPI
 // 依据: 07-前端设计.md §Composable 设计
-import { $fetch } from '#build/fetch.mjs'
+import { $fetch } from 'ofetch'
 import { ref, shallowRef } from '#imports'
 import type { Bar, BarPeriod, ETF, OHLCV } from '../types/etf'
 

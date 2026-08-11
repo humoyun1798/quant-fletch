@@ -27,7 +27,7 @@ const backtest = useBacktest()
 
     <section v-else class="p-6">
       <FeedbackEmptyState
-        icon="i-ph-arrow-left-right-duotone"
+        icon="i-ph-arrows-left-right-duotone"
         title="先跑回测，信号自动出现在这里"
       >
         <template #hint>

@@ -47,10 +47,16 @@ class MomentumRotate(BaseStrategy):
         self.lookback: int = int(params['lookback'])
         self.top_n: int = int(params['top_n'])
         self.rebalance: str = params['rebalance']
+        # BL 分配方法 (ponytail: 默认 'equal' 向后兼容, 'bl' 启用 Black-Litterman)
+        self.alloc_method: str = params.get('alloc_method', 'equal')
+        self._price_data: pl.DataFrame | None = None  # 缓存最近一次 OHLCV
 
     def score(
         self, df: pl.DataFrame, universe: list[str], current_date: date,
     ) -> dict[str, float]:
+        # 缓存价格数据供 BL 分配使用
+        self._price_data = df
+
         # 优先使用 FeatureService 预计算的因子列
         if 'momentum' in df.columns:
             cutoff = df.filter(
@@ -80,6 +86,43 @@ class MomentumRotate(BaseStrategy):
         self, scores: dict[str, float], portfolio: PortfolioState,
         current_date: date,
     ) -> list[Signal]:
+        # ── BL 分配分支 (§6.2) ──
+        if self.alloc_method == 'bl':
+            all_codes = list(scores.keys())
+            if not all_codes:
+                return []
+
+            # 懒加载市场权重
+            if not hasattr(self, '_market_weights'):
+                try:
+                    self._market_weights = _load_market_weights()
+                except Exception:
+                    self._market_weights = {}
+
+            # 构建协方差矩阵
+            if self._price_data is not None:
+                cov = build_cov_from_prices(self._price_data, all_codes, window=60)
+            else:
+                cov = None
+
+            if cov is not None:
+                from .allocation import (
+                    _load_market_weights,
+                    allocate_with_method,
+                    build_cov_from_prices,
+                )
+                signals, _weights = allocate_with_method(
+                    all_codes, scores, cov, portfolio, top_n=self.top_n,
+                    method='bl',
+                    all_codes=all_codes,
+                    all_scores=scores,
+                    market_weights=self._market_weights,
+                    risk_aversion=2.5,
+                )
+                return signals
+            # cov is None: fall through to equal
+
+        # ── 默认等权分配 ──
         ranked = sorted(scores.items(), key=lambda x: x[1], reverse=True)
         top = ranked[:self.top_n]
         if not top:

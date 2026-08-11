@@ -46,6 +46,9 @@ class TrendMA(BaseStrategy):
         self.lookback: int = int(params['lookback'])
         self.top_n: int = int(params['top_n'])
         self.ma_period: int = int(params['ma_period'])
+        # BL 分配方法 (ponytail: 默认 'equal' 向后兼容, 'bl' 启用 Black-Litterman)
+        self.alloc_method: str = params.get('alloc_method', 'equal')
+        self._price_data: pl.DataFrame | None = None  # 缓存最近一次 OHLCV
 
     def filter_universe(
         self, df: pl.DataFrame, portfolio: PortfolioState, current_date: date,
@@ -69,6 +72,8 @@ class TrendMA(BaseStrategy):
     def score(
         self, df: pl.DataFrame, universe: list[str], current_date: date,
     ) -> dict[str, float]:
+        # 缓存价格数据供 BL 分配使用
+        self._price_data = df
         cutoff = df.filter(pl.col.date <= current_date)
 
         # 优先使用 FeatureService 预计算的因子列
@@ -97,6 +102,41 @@ class TrendMA(BaseStrategy):
         self, scores: dict[str, float], portfolio: PortfolioState,
         current_date: date,
     ) -> list[Signal]:
+        # ── BL 分配分支 (§6.2) ──
+        if self.alloc_method == 'bl':
+            all_codes = list(scores.keys())
+            if not all_codes:
+                return []
+
+            # 懒加载市场权重
+            if not hasattr(self, '_market_weights'):
+                try:
+                    from .allocation import _load_market_weights
+                    self._market_weights = _load_market_weights()
+                except Exception:
+                    self._market_weights = {}
+
+            # 构建协方差矩阵
+            if self._price_data is not None:
+                from .allocation import build_cov_from_prices
+                cov = build_cov_from_prices(self._price_data, all_codes, window=60)
+            else:
+                cov = None
+
+            if cov is not None:
+                from .allocation import allocate_with_method
+                signals, _weights = allocate_with_method(
+                    all_codes, scores, cov, portfolio, top_n=self.top_n,
+                    method='bl',
+                    all_codes=all_codes,
+                    all_scores=scores,
+                    market_weights=self._market_weights,
+                    risk_aversion=2.5,
+                )
+                return signals
+            # cov is None: fall through to equal
+
+        # ── 默认等权分配 ──
         ranked = sorted(scores.items(), key=lambda x: x[1], reverse=True)
         top = ranked[:self.top_n]
         if not top:

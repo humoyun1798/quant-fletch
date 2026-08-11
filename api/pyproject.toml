@@ -51,6 +51,7 @@ strict = true
 python_version = "3.14"
 
 [tool.pytest.ini_options]
+pythonpath = ["src"]
 addopts = "--cov=src --cov-report=term-missing --strict-markers"
 markers = [
     "unit: Unit tests",

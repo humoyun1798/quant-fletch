@@ -6,6 +6,7 @@ import DisplayBadge from '@antfu/design/components/Display/DisplayBadge.vue'
 interface Props {
   status: string
   progress: number
+  currentStep: string
   disabled: boolean
 }
 
@@ -52,6 +53,22 @@ const badgeColor = computed(() => {
   const map: Record<string, string> = { running: 'blue', completed: 'green', failed: 'red' }
   return map[props.status] || false
 })
+
+const stepLabels: Record<string, string> = {
+  preparing_features: 'Preparing data',
+  scoring: 'Computing scores',
+  running: 'Running backtest',
+  completed: 'Completed',
+  failed: 'Failed',
+}
+
+const runningLabel = computed(() => {
+  if (props.status !== 'running') return 'Run Backtest'
+  const pct = Math.round(props.progress * 100)
+  if (pct > 0) return `Running ${pct}%`
+  const step = props.currentStep || 'running'
+  return stepLabels[step] || 'Running…'
+})
 </script>
 
 <template>
@@ -69,7 +86,7 @@ const badgeColor = computed(() => {
         class="text-sm"
         :class="status === 'running' ? 'i-ph-circle-notch-duotone animate-spin' : 'i-ph-play-circle-duotone'"
       />
-      {{ status === 'running' ? `Running ${Math.round(progress * 100)}%` : 'Run Backtest' }}
+      {{ runningLabel }}
     </button>
 
     <DisplayBadge v-if="status !== 'idle'" :text="badgeText" variant="solid" :color="badgeColor" />

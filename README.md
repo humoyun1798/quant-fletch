@@ -46,13 +46,33 @@ docker compose -f docker/docker-compose.yml up
 
 ## 内置策略
 
-| 策略 | 文件 | 核心逻辑 |
-|------|------|---------|
-| 动量轮动 | `momentum_rotate.py` | N 日涨跌幅排序，持有 Top K |
-| 多因子打分 | `multi_factor.py` | 动量 + 波动率 + 成交量 + 夏普 4 因子加权 |
-| 趋势 + MA 过滤 | `trend_ma.py` | MA 均线过滤趋势 + 动量打分 |
-| 风险平价 | `risk_parity.py` | 波动率倒数加权，等风险贡献 |
-| 止损动量 | `stop_loss_momentum.py` | 动量轮动 + 移动止损 |
+| 策略 | 文件 | 核心逻辑 | 分配方法 |
+|------|------|---------|---------|
+| 动量轮动 | `momentum_rotate.py` | N 日涨跌幅排序，持有 Top K | Equal / BL |
+| 多因子打分 | `multi_factor.py` | 动量 + 波动率 + 成交量 + 夏普 4 因子加权 | Equal / MaxDiv / MinVar / InvVol |
+| 趋势 + MA 过滤 | `trend_ma.py` | MA 均线过滤趋势 + 动量打分 | Equal / BL |
+| 风险平价 | `risk_parity.py` | 波动率倒数加权，等风险贡献 | InvVol |
+| 止损动量 | `stop_loss_momentum.py` | 动量轮动 + 移动止损 | Equal |
+
+### 分配方法
+
+`allocation.py` 提供 6 种权重分配算法，策略通过 `alloc_method` 参数切换：
+
+| 方法 | 算法 | 说明 |
+|------|------|------|
+| `equal` | 等权 | 默认，所有选中品种平均分配 |
+| `max_div` | 最大分散度 | 最大化分散比率 (Diversification Ratio) |
+| `min_var` | 最小方差 | 全局最小方差组合，无约束 |
+| `inv_vol` | 波动率倒数 | 低波高配，高波低配 |
+| `bl` | **Black-Litterman** | 策略打分 → 预期收益观点 + 市值均衡先验 → 贝叶斯融合 → MV 优化 |
+| _(risk_parity)_ | 风险平价 | 等风险贡献，内置于 `risk_parity.py` |
+
+BL 算法完整实现（见 `allocation.py` `bl_weights()`）：
+- π = λ·Σ·w_mkt 均衡收益（市值权重从 PostgreSQL `etf_info.fund_size` 读取）
+- 策略动量打分映射为绝对观点 (P, Q 矩阵)
+- Ω 对角不确定性（Idzorek 置信度加权）
+- 贝叶斯后验 μ_BL = [(τΣ)⁻¹ + P'Ω⁻¹P]⁻¹[(τΣ)⁻¹π + P'Ω⁻¹Q]
+- 梯度投影 MV 优化 + Duchi 单纯形投影（不引入 scipy 依赖）
 
 所有策略继承 `BaseStrategy` ABC，实现 `register()` → `warmup()` → `prepare_features()` → `score()` → `allocate()` → `to_signals()` → `execute()` 9 步生命周期。添加自定义策略只需继承基类并放入 `strategies/` 目录——`importlib` 自动发现。
 
@@ -83,6 +103,7 @@ quant-fletch/
 │   │   ├── backtest/       # 回测引擎（自研 + VectorBT 适配）
 │   │   ├── data/           # 数据管线（日历/源适配/校验/清洗/因子）
 │   │   ├── db/             # DuckDB + PostgreSQL 连接管理
+│   │   ├── optimizer/      # 超参优化（Optuna）
 │   │   ├── server/         # FastAPI 路由（ETF/策略/回测/系统）
 │   │   └── strategies/     # 策略插件（自动发现）
 │   ├── tests/              # pytest + pytest-cov
@@ -138,14 +159,12 @@ BacktestConfig ───┤
 - **双数据库** — DuckDB 做分析查询（列存），PostgreSQL 做事务持久化（行存）
 - **双数据源** — Sina + 东方财富互备，单源故障不阻塞流程
 
-## 已知限制（v1.0）
-
-这是 v1.0 版本，存在以下已知问题，正在迭代修复中：
+## 已知限制
 
 - 日线尚未启用前复权（种子流程使用 Sina 不复权数据）
-- 行业 ETF 与宽基 ETF 共用同一套动量因子，尚未引入申万行业指数
-- 回测结果仅存内存，重启丢失（Phase 1 接入 PostgreSQL 持久化）
-- FeatureService 因子引擎已实现但尚未接入回测主循环
+- 行业 ETF 与宽基 ETF 共用同一套动量因子，申万行业指数数据源已接入但尚未集成到策略打分
+- 回测结果已存入 PostgreSQL `backtest_run` 表持久化，重启不丢失
+- FeatureService 因子列（momentum 等）已被策略 `score()` 读取使用，但回测主循环仍以策略内计算为主
 - 分钟线数据已拉取但回测引擎仅支持日频
 
 详见 [迭代方案](https://github.com/AbelTami/quant-fletch/blob/main/docs/迭代/README.md)。

@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import { computed } from '#imports'
-import { useRouter } from '#app/composables/router'
+import { computed, useRouter } from '#imports'
 import type { SignalResult } from '../types/signal'
 import FeedbackEmptyState from '@antfu/design/components/Feedback/FeedbackEmptyState.vue'
 import ActionButton from '@antfu/design/components/Action/ActionButton.vue'

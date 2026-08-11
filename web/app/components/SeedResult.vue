@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // SeedResult: 种子完成/失败结果覆盖层
 // 依据: 迭代/v3/README.md Phase 3 §SeedResult
-import { useRouter } from '#app/composables/router'
+import { useRouter } from '#imports'
 import ActionButton from '@antfu/design/components/Action/ActionButton.vue'
 
 interface FailedEtf {
@@ -18,9 +18,10 @@ interface Props {
   errorMessage?: string
 }
 
-const props = withDefaults(defineProps<Props>(), {
+withDefaults(defineProps<Props>(), {
   successCount: 0,
   failedEtfs: () => [],
+  errorMessage: '',
 })
 
 const emit = defineEmits<{
@@ -63,12 +64,12 @@ function onEnter() {
 
     <!-- 失败 -->
     <template v-else>
-      <span class="i-ph-x-circle-duotone text-6xl color-#EF4444" />
+      <span class="i-ph-x-circle-duotone text-6xl color-down" />
       <h2 class="text-lg font-medium color-base">数据初始化失败</h2>
       <p class="text-xs op-fade max-w-md">
         {{ errorMessage || 'AkShare 不可用，请检查网络连接后重试' }}
       </p>
-      <ActionButton variant="primary" @click="emit('retry', 'full')" class="mt-2">
+      <ActionButton variant="primary" class="mt-2" @click="emit('retry', 'full')">
         <span class="i-ph-arrow-clockwise-duotone" />全部重试
       </ActionButton>
     </template>

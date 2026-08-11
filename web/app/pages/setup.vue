@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { $fetch } from '#build/fetch.mjs'
+import { $fetch } from 'ofetch'
 import { shallowRef, computed, onMounted, onUnmounted } from '#imports'
 import ActionButton from '@antfu/design/components/Action/ActionButton.vue'
 import SeedHero from '../components/SeedHero.vue'
@@ -37,7 +37,7 @@ async function checkStatus() {
     const d = res.data
     status.value = d.status
     if (d.progress) {
-      seedProgress.value = d.progress as SeedProgress
+      seedProgress.value = d.progress as unknown as SeedProgress
     }
   }
   catch {
@@ -115,7 +115,7 @@ onUnmounted(() => {
           没有找到数据。运行种子流程以获取 ETF 历史数据（需要网络访问 AkShare）。
         </p>
         <ActionButton variant="primary" @click="triggerSeed('full')">
-          <span class="i-ph-seedling-duotone" />开始初始化
+          <span class="i-ph-plant-duotone" />开始初始化
         </ActionButton>
       </div>
 

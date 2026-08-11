@@ -1,7 +1,7 @@
 // @env browser
 // 策略管理 — 模块级单例，所有组件共享策略列表和选中状态
 // 依据: 07-前端设计.md §Composable 设计
-import { $fetch } from '#build/fetch.mjs'
+import { $fetch } from 'ofetch'
 import { ref, shallowRef } from '#imports'
 import type { StrategyMeta } from '../types/strategy'
 

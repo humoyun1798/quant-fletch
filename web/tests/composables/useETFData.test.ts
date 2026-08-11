@@ -2,7 +2,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { useETFData } from '../../app/composables/useETFData'
 
 const mockFetch = vi.fn()
-vi.mock('#build/fetch.mjs', () => ({
+vi.mock('ofetch', () => ({
   $fetch: (...args: unknown[]) => mockFetch(...args),
 }))
 

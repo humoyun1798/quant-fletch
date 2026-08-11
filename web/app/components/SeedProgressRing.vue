@@ -31,6 +31,7 @@ function animateRing() {
   if (!gsap || !ringRef.value) return
   // Try DrawSVGPlugin if available
   try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const DrawSVGPlugin = (gsap as any).plugins?.drawSVG
     if (DrawSVGPlugin) {
       gsap.fromTo(ringRef.value,
@@ -40,7 +41,7 @@ function animateRing() {
       return
     }
   }
-  catch {}
+  catch { /* DrawSVGPlugin not available, fallback to CSS transition */ }
   // Fallback: CSS transition via stroke-dashoffset (applied reactively)
 }
 

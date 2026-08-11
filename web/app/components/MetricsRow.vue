@@ -31,9 +31,9 @@ const metricDefs: MetricDef[] = [
 ]
 
 function metricColor(val: number, invert?: boolean): string {
-  if (invert) return val < 0 ? 'color-#EF4444' : 'color-#22C45D'
-  if (val > 0) return 'color-#EF4444'
-  if (val < 0) return 'color-#22C45D'
+  if (invert) return val < 0 ? 'color-down' : 'color-up'
+  if (val > 0) return 'color-down'
+  if (val < 0) return 'color-up'
   return ''
 }
 </script>

@@ -18,9 +18,9 @@ import FeedbackEmptyState from '@antfu/design/components/Feedback/FeedbackEmptyS
 import LayoutSplitPane from '@antfu/design/components/Layout/LayoutSplitPane.vue'
 import { Pane } from 'splitpanes'
 
-const { strategies, selected, params, fetchAll } = useStrategy()
+const { strategies, selected, params, fetchAll, updateParam } = useStrategy()
 const backtest = useBacktest()
-const { staggerList } = useMotion()
+const { staggerList, metricsBounce } = useMotion()
 
 const selectedMeta = shallowRef<StrategyMeta | null>(null)
 
@@ -33,6 +33,7 @@ watch(selected, (name) => {
   if (name) {
     selectedMeta.value = strategies.value.find(s => s.name === name) ?? null
   }
+  backtest.reset()
 })
 
 function isSliderParam(p: ParamDef): boolean {
@@ -79,7 +80,7 @@ function startBacktest() {
                 <FormSegmentedControl
                   :options="p.choices.map(c => ({ value: c, label: c }))"
                   :model-value="String(params[p.name] ?? p.default)"
-                  @update:model-value="(v: string | number | null) => params = { ...params, [p.name]: v }"
+                  @update:model-value="(v: string | number | null | undefined) => { if (v != null) updateParam(p.name, v) }"
                 />
               </div>
               <!-- number with min/max → ParamSlider -->
@@ -90,7 +91,7 @@ function startBacktest() {
                 :min="p.min!"
                 :max="p.max!"
                 :model-value="Number(params[p.name] ?? p.default)"
-                @update:model-value="(v: number) => params = { ...params, [p.name]: v }"
+                @update:model-value="(v: number | undefined) => { if (v !== undefined) updateParam(p.name, v) }"
               />
               <!-- number without min/max → FormNumberInput -->
               <div v-else-if="isNumberParam(p)" class="flex flex-col gap-1">
@@ -98,7 +99,7 @@ function startBacktest() {
                 <FormNumberInput
                   :model-value="Number(params[p.name] ?? p.default)"
                   :step="p.type === 'int' ? 1 : 0.1"
-                  @update:model-value="(v: number) => params = { ...params, [p.name]: v }"
+                  @update:model-value="(v: number | undefined) => { if (v !== undefined) updateParam(p.name, v) }"
                 />
               </div>
             </template>
@@ -109,6 +110,7 @@ function startBacktest() {
           <BacktestTrigger
             :status="backtest.status.value"
             :progress="backtest.progress.value"
+            :current-step="backtest.currentStep.value"
             :disabled="!selected"
             @run="startBacktest"
           />
@@ -122,7 +124,7 @@ function startBacktest() {
         <template v-if="backtest.result.value">
           <EquityCurveChart
             :data="backtest.result.value.equity_curve"
-            @ready="staggerList('.metrics-row > *')"
+            @ready="metricsBounce('.metrics-row > *')"
           />
           <hr class="border-base/30 mx-3">
           <div class="metrics-row">
@@ -132,7 +134,7 @@ function startBacktest() {
           <RebalanceHistory :signals="backtest.result.value.signals" />
         </template>
 
-        <section v-else-if="backtest.status.value === 'completed'" class="p-3">
+        <section v-else-if="backtest.status.value === 'completed' || backtest.status.value === 'failed'" class="p-3">
           <div v-if="backtest.error.value" class="flex items-start gap-2">
             <FeedbackTip type="error" class="flex-1">
               {{ backtest.error.value }}

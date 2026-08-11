@@ -120,8 +120,18 @@ export function useMotion() {
     )
   }
 
+  // 数字翻牌: 值变化时 scale 弹跳
+  function numberBounce(el: Element) {
+    if (prefersReduced.value || !gsap) return
+    gsap.fromTo(el,
+      { scale: 0.7, opacity: 0.4 },
+      { scale: 1.05, opacity: 1, duration: 0.2, ease: 'back.out(2)' },
+    )
+    gsap.to(el, { scale: 1, duration: 0.15, delay: 0.2, ease: 'power2.out' })
+  }
+
   return {
     pageEnter, pageLeave, countUp, staggerList,
-    safeGsap, metricsBounce, glowPulse,
+    safeGsap, metricsBounce, glowPulse, numberBounce,
   }
 }

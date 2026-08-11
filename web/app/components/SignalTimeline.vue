@@ -40,7 +40,7 @@ defineProps<Props>()
               v-for="sig in s.signals"
               :key="sig.code"
               class="px-1 py-px rounded text-micro font-mono"
-              :class="sig.action === 'buy' ? 'bg-#EF444410 color-#EF4444 border border-#EF444420' : sig.action === 'sell' ? 'bg-#22C45D10 color-#22C45D border border-#22C45D20' : 'op-fade border border-base'"
+              :class="sig.action === 'buy' ? 'bg-up-soft color-up border border-up-soft' : sig.action === 'sell' ? 'bg-down-soft color-down border border-down-soft' : 'op-fade border border-base'"
             >
               {{ sig.action.toUpperCase() }} {{ sig.code }}
               <span class="op-fade">@ {{ (sig.target_weight * 100).toFixed(0) }}%</span>

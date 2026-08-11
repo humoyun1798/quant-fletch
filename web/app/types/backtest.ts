@@ -10,10 +10,17 @@ export interface BacktestConfig {
 
 export interface BacktestResult {
   run_id: string
+  strategy?: string
+  params?: Record<string, number | string>
+  start_date?: string
+  end_date?: string
   status: 'queued' | 'running' | 'completed' | 'failed'
   metrics: Metrics | null
   equity_curve: EquityPoint[]
   signals: SignalResult[]
+  error?: BacktestError
+  created_at?: string
+  finished_at?: string
 }
 
 export interface Metrics {
@@ -27,10 +34,16 @@ export interface Metrics {
   benchmark_return: number
   alpha: number
   avg_turnover: number
+  n_trading_days: number
 }
 
 export interface EquityPoint {
   date: string
   equity: number
   benchmark: number
+}
+
+export interface BacktestError {
+  code: string
+  message: string
 }

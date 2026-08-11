@@ -132,7 +132,7 @@ onUnmounted(() => {
       class="flex flex-col items-center justify-center gap-2"
       :style="{ height: `${height}px` }"
     >
-      <span class="i-ph-chart-candlestick-duotone text-2xl op-mute" />
+      <span class="i-ph-chart-line-up-duotone text-2xl op-mute" />
       <p class="text-xs op-fade">选择 ETF 查看 K 线</p>
     </div>
     <div

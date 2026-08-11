@@ -248,3 +248,32 @@ class TestRebalanceDay:
             'monthly', 25, date(2024, 2, 1),
             last_rebalance_month=1,
         ) is True
+
+    def test_unknown_freq_defaults_true(self):
+        """Unrecognized rebalance frequency defaults to rebalance every day."""
+        assert SelfLoopBacktester._is_rebalance_day(
+            'quarterly', 5, date(2024, 1, 8),
+        ) is True
+
+
+@pytest.mark.unit
+class TestSelfLoopBacktesterEdgeCases:
+    """Edge cases for the backtester."""
+
+    def test_empty_trading_days_raises(self, backtest_config):
+        """When calendar has no trading days, raise ValueError."""
+        from data.calendar import TradeCalendar
+        from unittest import mock as _mock
+
+        calendar = TradeCalendar()
+        calendar._loaded = True
+        calendar._open_dates = set()  # empty: no trading days
+
+        bt = SelfLoopBacktester()
+        with pytest.raises(ValueError, match='回测区间内无交易日'):
+            bt.run(
+                strategy=_mock.MagicMock(),
+                config=backtest_config,
+                feature_service=_mock.MagicMock(),
+                calendar=calendar,
+            )
