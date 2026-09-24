@@ -17,6 +17,59 @@ from .config import BacktestConfig, BacktestResult
 RISK_FREE_RATE = 0.03
 
 
+def _reconcile_target_portfolio(
+    signals: list[Signal], portfolio: PortfolioState,
+) -> list[Signal]:
+    """「目标组合」模式: 把当期目标之外的持仓补上卖出指令。
+
+    背景
+    ----
+    引擎只在收到 sell 信号时卖出 (`_Portfolio.execute`)。而轮动类策略的
+    `allocate()` 通常只回答"本期该持有哪几只"(发 buy), 从不发 sell ——
+    结果是只买不卖、持仓只增不减, 最终把池内标的几乎全买一遍,
+    排名与选股逻辑形同虚设 (实测: 改 lookback / ma_period 等选股参数,
+    净值指纹逐位不变)。这里补上缺失的另一半。
+
+    三类持仓的处理
+    --------------
+    1. 持有 且 不在目标内 → **卖出**(整仓清出)
+    2. 持有 且 在目标内   → 转为 `hold`, **不再买入**。
+       因为引擎的买入是按 `total_equity × 权重` 计算目标成本, 而不是增量;
+       若对已持有标的再发 buy, 会在原有仓位上再加一遍, 导致超配。
+    3. 未持有 且 在目标内 → 保留原 buy, 由引擎把卖出释放的现金分配过去。
+
+    Args:
+        signals: 策略(含 risk_overlay)输出的信号列表
+        portfolio: 当期持仓状态, `positions` 为 code → 持仓市值
+
+    Returns:
+        补全后的信号列表。卖出放在最前且已排序 —— 引擎逐笔累加现金对顺序敏感,
+        顺序不确定会导致浮点累加差异、进而让回测结果不可复现。
+    """
+    target: dict[str, float] = {
+        s.code: s.target_weight
+        for s in signals if s.action == 'buy' and s.target_weight > 0
+    }
+    if not target:
+        # 本期没有给出任何目标(如空仓/数据不足), 不做隐含操作, 原样返回
+        return signals
+
+    held = set(portfolio.positions)
+    sells = [
+        Signal(code=code, action='sell', target_weight=0.0, confidence=1.0,
+               reason='调出目标组合')
+        for code in sorted(held - set(target))
+    ]
+    holds = [
+        Signal(code=code, action='hold', target_weight=target[code],
+               confidence=1.0, reason='保留在目标组合内')
+        for code in sorted(held & set(target))
+    ]
+    # 只保留"未持有"的 buy; 已持有且仍在目标内的由上方的 hold 表达
+    buys = [s for s in signals if s.action != 'buy' or s.code not in held]
+    return sells + buys + holds
+
+
 @dataclass
 class _Portfolio:
     """内部持仓管理器 (非 frozen, 仅引擎内部使用)
@@ -83,11 +136,18 @@ class _Portfolio:
             scale = available / total_cost
 
         for sig, fill_price, target_cost in plans:
-            actual_cost = target_cost * scale
-            if actual_cost > 0 and actual_cost <= self.cash:
-                qty = actual_cost / (fill_price * (1 + config.commission))
-                self.shares[sig.code] = self.shares.get(sig.code, 0) + qty
-                self.cash -= actual_cost
+            # 用 min(..., self.cash) 截断, 而非 `actual_cost <= self.cash` 判定后丢弃。
+            # 缩放后各笔目标成本之和 ≈ 可用现金, 末位浮点误差会让最后一笔恰好超出,
+            # 从而被【整笔丢弃】—— 丢掉的是整个仓位, 不是舍入的零头; 且丢哪一笔取决于
+            # 买入顺序, 而顺序又受 set 迭代 / polars 分组顺序影响。
+            # 后果: 同一策略同一参数, 实测总收益在 -17% ~ +89% 之间跳动, 结果既不可
+            # 复现也不正确。改成截断后, 最多只损失浮点零头, 与顺序无关。
+            actual_cost = min(target_cost * scale, self.cash)
+            if actual_cost <= 0:
+                continue
+            qty = actual_cost / (fill_price * (1 + config.commission))
+            self.shares[sig.code] = self.shares.get(sig.code, 0) + qty
+            self.cash -= actual_cost
 
     def record_equity(
         self, current_date: date, price_df: pl.DataFrame,
@@ -187,6 +247,12 @@ class SelfLoopBacktester:
                 scores = strategy.score(features, universe, day_date)
                 raw_signals = strategy.allocate(scores, ps, day_date)
                 signals = strategy.risk_overlay(raw_signals, ps, day_date)
+
+                # 「目标组合」模式: 补上"卖出目标之外持仓"的指令。
+                # 放在 risk_overlay 之后, 使风控叠加的指令也一并纳入核对。
+                if strategy.meta.position_mode == 'target':
+                    signals = _reconcile_target_portfolio(signals, ps)
+
                 result = strategy.generate_signals(signals, ps, day_date)
                 portfolio.execute(result, cutoff, config)
                 strategy.on_day_end(result, ps, day_date)

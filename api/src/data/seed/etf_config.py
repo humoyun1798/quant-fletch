@@ -1,4 +1,4 @@
-# ETF 池子配置 (30 只)
+# ETF 池子配置 (30 只原始 + 7 只个人自选补充 - 3 只断层标的 = 34 只)
 # 数据来源: 文档 09-ETF池子.md, 2026-08-07 实测验证 10 只核心 ETF
 # ponytail: 硬编码 list, 当需要运行时动态增减时改为 DB 读取
 # 校验规则: 存在性 + 列完整性 + >=252 行 + 价格合理性 + 日期连续性
@@ -63,8 +63,16 @@ ETF_POOL: list[ETFConfig] = [
               name='新能车ETF', type='sector', underlying='930997.SH'),
     ETFConfig(code='512660.SH', sina_symbol='sh512660', em_symbol='512660',
               name='军工ETF', type='sector', underlying='399967.SZ'),
-    ETFConfig(code='515880.SH', sina_symbol='sh515880', em_symbol='515880',
-              name='通信ETF', type='sector', underlying='931160.SH'),
+    # ── 已移除: 通信 / 银行 两个行业 ──
+    # 515880 通信ETF、515050 通信ETF华夏、512800 银行ETF华宝
+    # 移除原因: 这三只的 adj_close 存在公司行为(份额折算/分红)造成的价格断层
+    #   (515880 在 2026-02-03 有 -65.70%、2026-07-06 有 -52.06%;
+    #    515050 在 2026-05-13 有 -65.29%; 512800 在 2025-07-07 有 -49.69%),
+    #   而不复权价会让 MA10 之类的策略误判为"跌破"并触发假止损。
+    # 详见 tools/qf_data_quality_report.md。
+    # ⚠️ 注意: 从池子里删掉【不会】自动清掉已入库的数据 —— seed 是按 code
+    #   删了再写(只删本次要写的), 已存量的 etf_daily/etf_minute/etf_info 会保留、
+    #   回测照样会交易它们。必须另行 DELETE。
     ETFConfig(code='512010.SH', sina_symbol='sh512010', em_symbol='512010',
               name='医药卫生ETF', type='sector', underlying='000933.SH'),
     ETFConfig(code='510880.SH', sina_symbol='sh510880', em_symbol='510880',
@@ -96,6 +104,22 @@ ETF_POOL: list[ETFConfig] = [
               name='有色金属ETF', type='commodity'),
     ETFConfig(code='159981.SZ', sina_symbol='sz159981', em_symbol='159981',
               name='能源化工ETF', type='commodity'),
+
+    # ===== 个人自选补充 (7 只) =====
+    # 来源: 用户实际持仓/自选清单中缺失的场内 ETF。
+    # 仅补充 ETF, 不含个股 (如东瑞股份 001201 属个股, 不在本池范围内)。
+    # 代码与名称均经 akshare 实际拉取校验 (Sina 日线可用, 最新数据 2026-09-18)。
+    # 未填 underlying/inception/expense 的项为未核实, 留空而非填猜测值。
+    ETFConfig(code='515220.SH', sina_symbol='sh515220', em_symbol='515220',
+              name='煤炭ETF国泰', type='sector'),
+    ETFConfig(code='159865.SZ', sina_symbol='sz159865', em_symbol='159865',
+              name='养殖ETF国泰', type='sector'),
+    ETFConfig(code='512890.SH', sina_symbol='sh512890', em_symbol='512890',
+              name='红利低波ETF华泰柏瑞', type='sector'),
+    ETFConfig(code='560860.SH', sina_symbol='sh560860', em_symbol='560860',
+              name='工业有色ETF万家', type='commodity'),
+    ETFConfig(code='159652.SZ', sina_symbol='sz159652', em_symbol='159652',
+              name='有色ETF汇添富', type='commodity'),
 ]
 
 # 初始化最低要求

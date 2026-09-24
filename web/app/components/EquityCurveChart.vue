@@ -75,7 +75,7 @@ function createChartInstance() {
     lineWidth: 2,
     priceLineVisible: false,
     lastValueVisible: true,
-    title: 'Equity',
+    title: '策略净值',
   })
 
   benchmarkLine = chart.addLineSeries({
@@ -84,7 +84,7 @@ function createChartInstance() {
     lineStyle: 2, // dashed
     priceLineVisible: false,
     lastValueVisible: true,
-    title: 'Benchmark',
+    title: '基准净值',
   })
 }
 
@@ -148,7 +148,7 @@ onUnmounted(() => {
 
 <template>
   <section class="px-3 py-2">
-    <h2 class="text-sm font-medium color-base mb-1">Equity Curve</h2>
+    <h2 class="text-sm font-medium color-base mb-1">净值曲线</h2>
     <div class="border border-base rounded overflow-hidden relative">
       <div
         v-if="data.length === 0"

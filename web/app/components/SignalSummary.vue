@@ -40,7 +40,7 @@ function fmtPct(val: number): string {
 
 <template>
   <section class="p-3 border-b border-base">
-    <h2 class="text-sm font-medium color-base mb-2">Signal Summary</h2>
+    <h2 class="text-sm font-medium color-base mb-2">信号汇总</h2>
 
     <FeedbackEmptyState
       v-if="signals.length === 0"

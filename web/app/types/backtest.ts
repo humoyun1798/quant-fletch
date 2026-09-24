@@ -3,8 +3,9 @@ import type { SignalResult } from './signal'
 export interface BacktestConfig {
   strategy: string
   params: Record<string, number | string>
-  start_date: string
-  end_date: string
+  /** 留空则由后端决定: start 默认 2020-01-01, end 默认库中最新交易日 */
+  start_date?: string
+  end_date?: string
   benchmark: string
 }
 

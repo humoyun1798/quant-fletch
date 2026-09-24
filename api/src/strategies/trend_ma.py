@@ -25,6 +25,10 @@ class TrendMA(BaseStrategy):
         tags=['趋势', '均线', 'ETF'],
         min_bars=200,
         rebalance_freq='weekly',
+        # 目标组合语义: 引擎自动卖出目标之外的持仓 (本策略只发 buy)。
+        # 此前后 ma_period 从 200 改到 5、316/344 个调仓日选中标的不同,
+        # 净值却逐位相同 —— 就是因为只买不卖、最终收敛到持有全池。
+        position_mode='target',
     )
 
     @classmethod
@@ -35,10 +39,16 @@ class TrendMA(BaseStrategy):
             [
                 ParamDef(name='lookback', default=60, type='int',
                          min=10, max=250, description='动量回看天数'),
-                ParamDef(name='top_n', default=5, type='int',
-                         min=1, max=15, description='持仓 ETF 数量'),
-                ParamDef(name='ma_period', default=200, type='int',
-                         min=20, max=500, description='均线周期'),
+                ParamDef(name='top_n', default=3, type='int',
+                         min=1, max=15, description='持仓 ETF 数量 (默认 3)'),
+                ParamDef(name='ma_period', default=60, type='int',
+                         min=20, max=500, description='均线周期 (默认 60)'),
+                # 2026-09-21 参数扫描: top_n 5→3、ma_period 200→60。
+                # 依据: ma_period 40/60/80 的收益 34.4%/42.1%/44.8% (平稳递增,
+                # 非尖峰), 而原默认 200 只有 7.9%; top_n=3 在 ma_period=60 与
+                # 200 下都优于 5 (2/2 一致)。
+                # 含义: 200 日均线在该池子上过严, 长期把大部分标的挡在门外。
+                # 注意: 本策略的绝对水平仍低 (夏普 0.09), 参数调优改变不了这一点。
             ],
         )
 

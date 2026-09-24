@@ -1,6 +1,17 @@
+# 显式固定项目名。默认项目名取自 compose 文件所在目录名, 而本目录恰好叫 "docker",
+# 会与其它同样位于名为 docker 的目录下的项目冲突 (实测与本机
+# D:\桌面\社媒项目\docker 项目的 docker_pgdata 卷撞车 —— 容器会挂载到同一份
+# PostgreSQL 数据目录, 表现为密码认证失败, 更糟的情况是污染对方数据库)。
+# 固定项目名后, 容器与卷统一使用 quant-fletch- 前缀, 互不干扰。
+name: quant-fletch
+
 services:
   db:
-    image: timescale/timescaledb:2.17.2-pg16
+    # 原配置为 timescale/timescaledb:2.17.2-pg16。
+    # 代码中未使用任何 TimescaleDB 专有特性 (gen_random_uuid 是 PG13+ 内核函数,
+    # time_bucket 是 DuckDB 原生函数), 故复用本机已有镜像, 省 500MB 下载与磁盘占用。
+    # 如需时间分区能力可改回: timescale/timescaledb:2.17.2-pg16
+    image: pgvector/pgvector:pg16
     environment:
       POSTGRES_DB: quant_fletch
       POSTGRES_USER: quant
@@ -15,9 +26,16 @@ services:
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
+    # 注意: 官方 postgres 镜像启动时必须 chmod 数据目录并 setuid 切到 postgres 用户。
+    # cap_drop: ALL 会剥夺 CAP_CHOWN/CAP_FOWNER/CAP_SETUID, 导致容器立即退出 (exit 1):
+    #   chmod: changing permissions of '/var/lib/postgresql/data': Operation not permitted
+    #   error: failed switching to 'postgres': operation not permitted
+    # read_only 下 /var/run/postgresql (unix socket) 也必须可写, 否则报 Read-only file system。
+    # 故此处移除 cap_drop, 并用 tmpfs 提供可写的 socket 目录。
     read_only: true
-    cap_drop:
-      - ALL
+    tmpfs:
+      - /var/run/postgresql
+      - /tmp
 
   api:
     build:
@@ -26,20 +44,32 @@ services:
     environment:
       DATABASE_URL: postgresql://quant:${DB_PASSWORD:-changeme}@db:5432/quant_fletch
       DUCKDB_PATH: /app/data/quant.duckdb
+    # 宿主机端口改为 18000: Windows 保留区间 7948-8047 覆盖了 8000,
+    # Docker 无法绑定 (bind: An attempt was made to access a socket in a way forbidden
+    # by its access permissions)。宿主机改用 18000, 容器内仍为 8000。
+    ports:
+      - "18000:8000"
     volumes:
       - duckdb_data:/app/data
     depends_on:
       db:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      # 原配置用 curl, 但 python:3.14-slim 基础镜像不含 curl, 健康检查会恒失败,
+      # 导致 api 永远不 healthy → 依赖它的 nuxt 永远不启动。改用镜像自带的 python 探测。
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 10s
       timeout: 3s
       retries: 3
+      start_period: 20s
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
     read_only: true
+    # api 以非 root (appuser, uid 1001) 运行, 无需 setuid, 故保留 cap_drop。
+    # 仅需 tmpfs 保证临时文件可写。
+    tmpfs:
+      - /tmp
     cap_drop:
       - ALL
 
@@ -47,8 +77,21 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile.web
+      args:
+        # 后端地址。两个都是**构建期**注入 (nuxt.config 的 routeRules 与 Vite env
+        # 都在构建时求值), 所以改完必须重新 build nuxt 才生效。
+        #
+        # 当前: 均指向内网穿透后的公网地址 (用户要求)。
+        #
+        # ⚠️ 已知代价: API_BASE_URL 是 **SSR 侧**的服务端请求, 指向公网后
+        #   每次 SSR 都要绕公网一圈, 且 **frp 隧道一断, 本地界面也会取不到数据**
+        #   (2026-09-21 实际发生过: 隧道断 → 界面无数据)。
+        #   若想更稳, 把 API_BASE_URL 单独改回内网 http://api:8000 即可 ——
+        #   这样只有浏览器直连的 WebSocket 依赖隧道, 本地始终可用。
+        API_BASE_URL: http://101.42.40.10:10004
+        VITE_WS_ORIGIN: ws://101.42.40.10:10004
     environment:
-      API_BASE_URL: http://api:8000
+      API_BASE_URL: http://101.42.40.10:10004
     depends_on:
       api:
         condition: service_healthy
@@ -58,6 +101,8 @@ services:
     security_opt:
       - no-new-privileges:true
     read_only: true
+    tmpfs:
+      - /tmp
     cap_drop:
       - ALL
 

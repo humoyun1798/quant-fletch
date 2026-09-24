@@ -26,6 +26,8 @@ class MultiFactor(BaseStrategy):
         tags=["多因子", "动量", "波动率", "ETF"],
         min_bars=120,
         rebalance_freq="weekly",
+        # 目标组合语义: 引擎自动卖出目标之外的持仓 (本策略只发 buy)。
+        position_mode="target",
     )
 
     @classmethod
@@ -47,12 +49,16 @@ class MultiFactor(BaseStrategy):
             [
                 ParamDef(
                     name="lookback",
-                    default=60,
+                    default=20,
                     type="int",
                     min=10,
                     max=250,
-                    description="回看天数",
+                    description="回看天数 (默认 20)",
                 ),
+                # 2026-09-21 参数扫描: lookback 60→20、top_n 5→8。
+                # 依据: lookback 15/20/25 的收益 27.2%/64.7%/52.7%;
+                # top_n=8 在 lookback 20 与 120 下优于 5 (2/3)。
+                # ⚠️ 可信度中等 —— lookback=20 是局部高点而非宽平台。
                 ParamDef(
                     name="vol_window",
                     default=120,
@@ -63,11 +69,11 @@ class MultiFactor(BaseStrategy):
                 ),
                 ParamDef(
                     name="top_n",
-                    default=5,
+                    default=8,
                     type="int",
                     min=1,
                     max=15,
-                    description="持仓 ETF 数量",
+                    description="持仓 ETF 数量 (默认 8)",
                 ),
                 ParamDef(
                     name="w_momentum",
@@ -256,24 +262,33 @@ def _correlation_penalty(
             rets = cdf["daily_return"].to_list()
         else:
             adj = cdf["adj_close"].to_list()
-            if len(adj) < 2:
-                ret_series.append(np.array([]))
-                continue
-            rets = [adj[i] / adj[i - 1] - 1 for i in range(1, len(adj))]
+            rets = [adj[i] / adj[i - 1] - 1 for i in range(1, len(adj))] if len(adj) >= 2 else []
         ret_series.append(np.array(rets, dtype=np.float64))
 
-    # 对齐长度: 取所有序列的最短长度
-    min_len = min((len(r) for r in ret_series if len(r) > 0), default=0)
+    # 数据不足的标的必须先【整体剔除】再拼接。
+    # 原实现把空数组也塞进 column_stack, 而 min_len 却跳过空数组计算,
+    # 导致空数组切片后长度仍为 0 → ValueError: array at index N has size 0。
+    # 触发条件: 回测起点早于部分 ETF 的上市日 —— 池内共 8 只如此
+    # (如芯片ETF 159995 首个交易日 2020-02-10, 而回测从 2020-01-01 起,
+    #  且 get_price_df 会再前推 365 天缓冲, 故早期调仓日取不到任何行)。
+    valid_idx = [i for i, r in enumerate(ret_series) if len(r) > 0]
+    if len(valid_idx) <= 1:
+        return np.zeros(n)
+
+    min_len = min(len(ret_series[i]) for i in valid_idx)
     if min_len < 20:
         return np.zeros(n)
 
-    ret_matrix = np.column_stack([r[-min_len:] for r in ret_series])
+    ret_matrix = np.column_stack([ret_series[i][-min_len:] for i in valid_idx])
     # ponytail: np.corrcoef 计算 pairwise 相关性, 当矩阵病态时 fallback
     try:
         corr = np.corrcoef(ret_matrix, rowvar=False)
-        # 每 ETF 的平均相关性 (排除自相关=1)
-        avg_corr = (corr.sum(axis=1) - 1.0) / (n - 1) if n > 1 else np.zeros(n)
-        return np.nan_to_num(avg_corr, nan=0.3)
+        # 每 ETF 的平均相关性 (排除自相关=1); 分母用有效标的数, 与 corr 维度一致
+        avg_valid = (corr.sum(axis=1) - 1.0) / (len(valid_idx) - 1)
+        # 数据不足的标的保持中性默认值, 保证返回长度仍为 n 且与 codes 对齐
+        out = np.full(n, 0.3)
+        out[valid_idx] = np.nan_to_num(avg_valid, nan=0.3)
+        return out
     except Exception:
         return np.full(n, 0.3)
 

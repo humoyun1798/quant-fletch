@@ -18,12 +18,12 @@ const selectedCode = shallowRef<string>('')
 const loading = shallowRef(false)
 
 const ohlcvColumns: Column[] = [
-  { key: 'date', label: 'Date', width: '100px' },
-  { key: 'open', label: 'Open', align: 'right', sortable: true },
-  { key: 'high', label: 'High', align: 'right', sortable: true },
-  { key: 'low', label: 'Low', align: 'right', sortable: true },
-  { key: 'close', label: 'Close', align: 'right', sortable: true },
-  { key: 'volume', label: 'Volume', align: 'right', sortable: true },
+  { key: 'date', label: '日期', width: '100px' },
+  { key: 'open', label: '开盘', align: 'right', sortable: true },
+  { key: 'high', label: '最高', align: 'right', sortable: true },
+  { key: 'low', label: '最低', align: 'right', sortable: true },
+  { key: 'close', label: '收盘', align: 'right', sortable: true },
+  { key: 'volume', label: '成交量', align: 'right', sortable: true },
 ]
 
 onMounted(() => {
@@ -65,7 +65,7 @@ async function onSelect(code: string | undefined) {
   <div class="data-grid flex-1 overflow-y-auto scroll-touch flex flex-col">
     <LayoutToolbar>
       <template #start>
-        <h2 class="text-sm font-medium color-base shrink-0">Data Browser</h2>
+        <h2 class="text-sm font-medium color-base shrink-0">数据浏览器</h2>
         <FormCombobox
           :options="etfOptions"
           :model-value="selectedCode"

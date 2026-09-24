@@ -17,6 +17,7 @@ import FeedbackTip from '@antfu/design/components/Feedback/FeedbackTip.vue'
 import FeedbackEmptyState from '@antfu/design/components/Feedback/FeedbackEmptyState.vue'
 import LayoutSplitPane from '@antfu/design/components/Layout/LayoutSplitPane.vue'
 import { Pane } from 'splitpanes'
+import { choiceLabel, paramLabel } from '../config/labels'
 
 const { strategies, selected, params, fetchAll, updateParam } = useStrategy()
 const backtest = useBacktest()
@@ -46,11 +47,12 @@ function isNumberParam(p: ParamDef): boolean {
 
 function startBacktest() {
   if (!selected.value) return
+  // 刻意不传 start_date / end_date: 由后端解析默认区间
+  // (start=2020-01-01, end=库中最新交易日)。原先这里硬编码
+  // end_date: '2025-12-31', 导致界面回测永远看不到 2026 年的数据。
   const config: BacktestConfig = {
     strategy: selected.value,
     params: { ...params.value },
-    start_date: '2020-01-01',
-    end_date: '2025-12-31',
     benchmark: '510300.SH',
   }
   backtest.run(config)
@@ -68,7 +70,7 @@ function startBacktest() {
 
         <section v-if="selected" class="p-3 border-b border-base">
           <div class="flex items-center gap-2 mb-2">
-            <h2 class="text-sm font-medium color-base">Parameters</h2>
+            <h2 class="text-sm font-medium color-base">参数</h2>
             <span class="font-mono text-xs color-active">{{ selected }}</span>
           </div>
 
@@ -76,9 +78,9 @@ function startBacktest() {
             <template v-for="p in selectedMeta?.params ?? []" :key="p.name">
               <!-- choice → FormSegmentedControl -->
               <div v-if="p.type === 'choice' && p.choices" class="flex flex-col gap-1">
-                <label class="text-xs color-base">{{ p.name }}</label>
+                <label class="text-xs color-base" :title="p.name">{{ paramLabel(p.name) }}</label>
                 <FormSegmentedControl
-                  :options="p.choices.map(c => ({ value: c, label: c }))"
+                  :options="p.choices.map(c => ({ value: c, label: choiceLabel(c) }))"
                   :model-value="String(params[p.name] ?? p.default)"
                   @update:model-value="(v: string | number | null | undefined) => { if (v != null) updateParam(p.name, v) }"
                 />
@@ -86,7 +88,7 @@ function startBacktest() {
               <!-- number with min/max → ParamSlider -->
               <ParamSlider
                 v-else-if="isSliderParam(p)"
-                :label="p.name"
+                :label="paramLabel(p.name)"
                 :description="p.description"
                 :min="p.min!"
                 :max="p.max!"
@@ -95,7 +97,7 @@ function startBacktest() {
               />
               <!-- number without min/max → FormNumberInput -->
               <div v-else-if="isNumberParam(p)" class="flex flex-col gap-1">
-                <label class="text-xs color-base">{{ p.name }}</label>
+                <label class="text-xs color-base" :title="p.name">{{ paramLabel(p.name) }}</label>
                 <FormNumberInput
                   :model-value="Number(params[p.name] ?? p.default)"
                   :step="p.type === 'int' ? 1 : 0.1"
@@ -122,6 +124,20 @@ function startBacktest() {
       <Pane :size="65" :min-size="30">
       <div class="overflow-y-auto scroll-touch h-full">
         <template v-if="backtest.result.value">
+          <!-- 回测区间: 由后端解析 (end 默认库中最新交易日), 显式展示避免误判为"数据缺失" -->
+          <div class="px-3 pt-2 pb-1 flex items-baseline gap-1.5 text-xs">
+            <span class="op-fade">回测区间</span>
+            <span class="font-mono tabular-nums color-base">
+              {{ backtest.result.value.start_date ?? '—' }}
+            </span>
+            <span class="op-fade">~</span>
+            <span class="font-mono tabular-nums color-base">
+              {{ backtest.result.value.end_date ?? '—' }}
+            </span>
+            <span class="op-mute">
+              （共 {{ backtest.result.value.metrics?.n_trading_days ?? 0 }} 个交易日）
+            </span>
+          </div>
           <EquityCurveChart
             :data="backtest.result.value.equity_curve"
             @ready="metricsBounce('.metrics-row > *')"
@@ -149,7 +165,7 @@ function startBacktest() {
             title="运行回测后显示"
           >
             <template #hint>
-              选择策略，调整参数，点击 Run Backtest
+              选择策略，调整参数，点击「运行回测」
             </template>
           </FeedbackEmptyState>
         </section>

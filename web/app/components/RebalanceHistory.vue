@@ -11,7 +11,7 @@ defineProps<Props>()
 
 <template>
   <section class="px-3 py-2">
-    <h2 class="text-sm font-medium color-base mb-1">Rebalance History</h2>
+    <h2 class="text-sm font-medium color-base mb-1">调仓历史</h2>
 
     <FeedbackEmptyState
       v-if="signals.length === 0"
@@ -27,11 +27,11 @@ defineProps<Props>()
       <table class="w-full text-xs">
         <thead>
           <tr class="border-b border-base text-left op-fade text-micro uppercase tracking-wide">
-            <th class="px-2 py-1 font-medium">Date</th>
-            <th class="px-2 py-1 font-medium">Positions</th>
-            <th class="px-2 py-1 font-medium">Turnover</th>
-            <th class="px-2 py-1 font-medium">Cash</th>
-            <th class="px-2 py-1 font-medium">Summary</th>
+            <th class="px-2 py-1 font-medium">日期</th>
+            <th class="px-2 py-1 font-medium">持仓数</th>
+            <th class="px-2 py-1 font-medium">换手率</th>
+            <th class="px-2 py-1 font-medium">现金</th>
+            <th class="px-2 py-1 font-medium">摘要</th>
           </tr>
         </thead>
         <tbody>

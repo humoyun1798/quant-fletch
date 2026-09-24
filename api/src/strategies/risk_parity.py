@@ -26,6 +26,8 @@ class RiskParity(BaseStrategy):
         tags=["风险平价", "波动率", "ETF"],
         min_bars=120,
         rebalance_freq="weekly",
+        # 目标组合语义: 引擎自动卖出目标之外的持仓 (本策略只发 buy)。
+        position_mode="target",
     )
 
     @classmethod

@@ -11,6 +11,7 @@ import DisplayProportionBar from '@antfu/design/components/Display/DisplayPropor
 import LayoutCard from '@antfu/design/components/Layout/LayoutCard.vue'
 import OverlayTooltip from '@antfu/design/components/Overlay/OverlayTooltip.vue'
 import type { ProportionSegment } from '@antfu/design/components/Display/DisplayProportionBar.vue'
+import { actionLabel } from '../config/labels'
 
 const router = useRouter()
 const { status, result, error } = useBacktest()
@@ -40,7 +41,7 @@ function weightTooltip(w: number): string {
 
 <template>
   <LayoutCard>
-    <h2 class="text-sm font-medium color-base mb-2">Current Positions</h2>
+    <h2 class="text-sm font-medium color-base mb-2">当前持仓</h2>
 
     <FeedbackSkeleton v-if="isLoading" variant="text" :lines="3" />
 
@@ -67,10 +68,10 @@ function weightTooltip(w: number): string {
       <table class="w-full text-xs">
         <thead>
           <tr class="border-b border-base text-left op-fade text-micro uppercase tracking-wide">
-            <th class="px-2 py-1 font-medium font-mono">Code</th>
-            <th class="px-2 py-1 font-medium font-mono text-right">Weight</th>
-            <th class="px-2 py-1 font-medium font-mono text-right">Confidence</th>
-            <th class="px-2 py-1 font-medium">Reason</th>
+            <th class="px-2 py-1 font-medium font-mono">代码</th>
+            <th class="px-2 py-1 font-medium font-mono text-right">权重</th>
+            <th class="px-2 py-1 font-medium font-mono text-right">置信度</th>
+            <th class="px-2 py-1 font-medium">理由</th>
           </tr>
         </thead>
         <tbody>
@@ -80,8 +81,8 @@ function weightTooltip(w: number): string {
             class="border-b border-base/50 hover:bg-active transition-colors duration-100"
           >
             <td class="px-2 py-1 font-mono tabular-nums">
-              <span class="px-1 py-px rounded text-micro border border-base op-fade uppercase tracking-wide">
-                {{ s.action }}
+              <span class="px-1 py-px rounded text-micro border border-base op-fade tracking-wide">
+                {{ actionLabel(s.action) }}
               </span>
               <span class="ml-1.5">{{ s.code }}</span>
             </td>

@@ -2,6 +2,7 @@
 import { shallowRef, computed, useNuxtApp } from '#imports'
 import { useMotion } from '../composables/useMotion'
 import DisplayBadge from '@antfu/design/components/Display/DisplayBadge.vue'
+import { stepLabel } from '../config/labels'
 
 interface Props {
   status: string
@@ -54,22 +55,12 @@ const badgeColor = computed(() => {
   return map[props.status] || false
 })
 
-const stepLabels: Record<string, string> = {
-  preparing_features: 'Preparing data',
-  scoring: 'Computing scores',
-  running: 'Running backtest',
-  completed: 'Completed',
-  failed: 'Failed',
-}
-
 const runningLabel = computed(() => {
-  if (props.status !== 'running') return 'Run Backtest'
+  if (props.status !== 'running') return '运行回测'
   const pct = Math.round(props.progress * 100)
-  if (pct > 0) return `Running ${pct}%`
-  const step = props.currentStep || 'running'
-  return stepLabels[step] || 'Running…'
-})
-</script>
+  if (pct > 0) return `回测中 ${pct}%`
+  return stepLabel(props.currentStep || 'running')
+})</script>
 
 <template>
   <div class="flex items-center gap-3">

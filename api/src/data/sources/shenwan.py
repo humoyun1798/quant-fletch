@@ -3,10 +3,22 @@
 import logging
 import time
 from dataclasses import dataclass
+from datetime import date as _date
 
 import polars as pl
 
 logger = logging.getLogger(__name__)
+
+
+def _yyyymmdd(s: str) -> _date:
+    """把 'YYYYMMDD' 或 'YYYY-MM-DD' 解析成 datetime.date。
+
+    `sector_daily.date` 是 Date 类型, 拿它直接跟 'YYYYMMDD' 字符串比较会报错。
+    """
+    s = s.strip()
+    if len(s) == 8 and s.isdigit():
+        return _date(int(s[:4]), int(s[4:6]), int(s[6:]))
+    return _date.fromisoformat(s[:10])
 
 
 @dataclass(frozen=True)
@@ -16,7 +28,10 @@ class SourceStatus:
     message: str = ''
 
 
-# ponytail: 手工校对 12 只行业 ETF → 申万行业名称映射 (11 只入表, 510880.SH 红利ETF 非行业ETF 排除)
+# 手工维护的「行业 ETF → 申万一级行业」映射。已移除 515880.SH 通信ETF
+# (该标的已从 ETF_POOL 删除, 留着会产生无效引用)。
+# 未纳入: 510880.SH 红利ETF / 512890.SH 红利低波 (非行业ETF, 不参与行业轮动);
+#         518880.SH 黄金ETF (商品); 159981.SZ 能源化工ETF (跨行业, 归类不唯一)。
 # 升级路径: ETF 池 > 50 时改为按 underlying 指数分类自动匹配
 ETF_TO_SW_INDUSTRY: dict[str, str] = {
     '512880.SH': '非银金融',     # 证券ETF → 399975.SZ 证券公司指数
@@ -26,9 +41,14 @@ ETF_TO_SW_INDUSTRY: dict[str, str] = {
     '515790.SH': '电力设备',     # 光伏ETF → 931151.SH 光伏产业
     '515030.SH': '汽车',         # 新能车ETF → 930997.SH 新能源车
     '512660.SH': '国防军工',     # 军工ETF → 399967.SZ 中证军工
-    '515880.SH': '通信',         # 通信ETF → 931160.SH 通信设备
-    '512010.SH': '医药生物',     # 医药卫生ETF → 000933.SH 中证医药
-    '512980.SH': '传媒',         # 传媒ETF → 399971.SZ 中证传媒
+    '512010.SH': '医药生物',     # 医药卫生ETF
+    # 以下为后续补入 (按申万一级行业名归类)
+    '515220.SH': '煤炭',         # 煤炭ETF国泰
+    '159865.SZ': '农林牧渔',     # 养殖ETF国泰
+    '159980.SZ': '有色金属',     # 有色金属ETF
+    '159652.SZ': '有色金属',     # 有色ETF汇添富
+    '560860.SH': '有色金属',     # 工业有色ETF万家
+    '512980.SH': '传媒',         # 传媒ETF
     '159869.SZ': '传媒',         # 游戏ETF → 399987.SZ 中证动漫游戏
 }
 # 510880.SH 红利ETF 跟踪上证红利指数(000015.SH), 非行业ETF, 不参与行业轮动
@@ -67,6 +87,9 @@ class ShenwanSource:
     def fetch_industry_list(self) -> pl.DataFrame:
         """拉取申万一级行业分类列表。
 
+        注意接口的「行业代码」带 `.SI` 后缀 (如 `801010.SI`), 而历史行情接口
+        `ak.index_hist_sw()` 要求**不带后缀**的代码, 故此处统一剥掉。
+
         Returns:
             DataFrame 列: industry_code (str), industry_name (str)
         """
@@ -76,7 +99,10 @@ class ShenwanSource:
 
         logger.info('[Shenwan] 拉取申万一级行业列表...')
         try:
-            raw = ak.index_sw_level1_spot()
+            # 原实现用 ak.index_sw_level1_spot() —— 该函数在当前 akshare 版本
+            # 已不存在 (AttributeError), 导致整个板块数据初始化在第一步就抛错、
+            # 被外层 try/except 静默跳过, sector_daily / etf_sector_map 永远是空表。
+            raw = ak.sw_index_first_info()
         except Exception as e:
             self._healthy = False
             raise RuntimeError(f'申万行业列表拉取失败: {e}') from e
@@ -86,14 +112,19 @@ class ShenwanSource:
             raise RuntimeError('申万行业列表返回空数据')
 
         df = pl.from_pandas(raw)
-        # 标准列名: 指数代码 → industry_code, 指数名称 → industry_name
+        # 标准列名: 行业代码 → industry_code, 行业名称 → industry_name
         df = df.rename({
-            '指数代码': 'industry_code',
-            '指数名称': 'industry_name',
+            '行业代码': 'industry_code',
+            '行业名称': 'industry_name',
         })
 
+        # 剥掉 .SI 后缀, 否则 index_hist_sw() 取不到数据
+        df = df.with_columns(
+            pl.col('industry_code').cast(pl.Utf8).str.replace(r'\.SI$', '').alias('industry_code'),
+        )
+
         # 只保留一级行业 (代码 801xxx 开头, 排除二级/三级)
-        df = df.filter(pl.col('industry_code').cast(pl.Utf8).str.starts_with('801'))
+        df = df.filter(pl.col('industry_code').str.starts_with('801'))
 
         self._healthy = True
         logger.info(f'[Shenwan] 行业列表: {len(df)} 个一级行业')
@@ -105,7 +136,7 @@ class ShenwanSource:
         """拉取单个申万行业指数日线数据。
 
         Args:
-            industry_code: 申万行业代码, 如 "801790" (非银金融)
+            industry_code: 申万行业代码 (不带 .SI 后缀), 如 "801790" (非银金融)
             start: 起始日期 YYYYMMDD, 默认 2015-01-01 (约 10 年)
             end: 结束日期 YYYYMMDD, 默认空 (最新)
 
@@ -118,7 +149,10 @@ class ShenwanSource:
 
         logger.info(f'[Shenwan] 拉取行业指数 {industry_code} ({start} ~ {end or "最新"})')
         try:
-            raw = ak.index_sw_hist(symbol=industry_code)
+            # 原实现用 ak.index_sw_hist() —— 该函数在当前 akshare 版本已不存在。
+            # 现用 index_hist_sw(symbol, period='day'): symbol 不带 .SI 后缀,
+            # 返回全量历史, 且**不含涨跌幅列** (需自行计算)。
+            raw = ak.index_hist_sw(symbol=industry_code, period='day')
         except Exception as e:
             self._healthy = False
             raise RuntimeError(
@@ -139,16 +173,19 @@ class ShenwanSource:
             '收盘': 'close',
             '成交量': 'volume',
             '成交额': 'amount',
-            '涨跌幅': 'change_pct',
         }
-        # 只 rename 存在的列
-        existing_renames = {k: v for k, v in rename_map.items() if k in df.columns}
-        df = df.rename(existing_renames)
+        df = df.rename({k: v for k, v in rename_map.items() if k in df.columns})
 
-        # 按日期过滤
-        df = df.filter(pl.col('date') >= start)
+        # sector_daily 表有 change_pct 列, 但该接口不返回, 按收盘价自行计算
+        df = df.sort('date').with_columns(
+            (pl.col('close') / pl.col('close').shift(1) - 1).alias('change_pct'),
+        )
+
+        # start/end 是 YYYYMMDD 字符串, 而 date 列是 Date 类型 ——
+        # 直接比字符串会报错, 必须先转成 datetime.date。
+        df = df.filter(pl.col('date') >= _yyyymmdd(start))
         if end:
-            df = df.filter(pl.col('date') <= end)
+            df = df.filter(pl.col('date') <= _yyyymmdd(end))
 
         # 添加行业代码列
         df = df.with_columns(pl.lit(industry_code).alias('industry_code'))
@@ -187,7 +224,13 @@ class ShenwanSource:
                 'etf_code': etf_code,
                 'industry_code': ind_code,
                 'industry_name': industry_name,
-                'verified': False,  # 手工验证后设为 True
+                # verified=True: 这些映射来自上方手工维护的 ETF_TO_SW_INDUSTRY,
+                # 每条都注明了所跟踪的指数, 本身就是"已人工核对"的。
+                # 原实现一律写 False, 而 sector_rotate.py 的查询带
+                # `WHERE verified = TRUE`, 导致映射永远查不到、行业轮动策略
+                # 拿不到行业数据而回落成纯动量 (与「双均线动量轮动」逐位相同)。
+                # 该标志保留的意义: 将来若改为按指数自动匹配, 那些条目应写 False。
+                'verified': True,
             })
 
         return pl.DataFrame(rows)

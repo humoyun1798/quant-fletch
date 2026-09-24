@@ -119,13 +119,19 @@ def build_cov_from_prices(
             rets = cdf["daily_return"].to_list()
         else:
             adj = cdf["adj_close"].to_list()
-            if len(adj) < 2:
-                ret_series.append(np.array([]))
-                continue
-            rets = [(adj[i] / adj[i - 1] - 1) for i in range(1, len(adj))]
+            rets = [(adj[i] / adj[i - 1] - 1) for i in range(1, len(adj))] if len(adj) >= 2 else []
         ret_series.append(np.array(rets, dtype=np.float64))
 
-    min_len = min((len(r) for r in ret_series if len(r) > 0), default=0)
+    # 协方差矩阵维度必须与 codes 一一对应 (调用方按下标索引), 且后续要做
+    # np.linalg.inv。故只要有标的取不到数据, 就直接返回 None 让调用方回落等权,
+    # 不要用零行/零列凑数 —— 那会得到奇异矩阵, inv 会抛 LinAlgError。
+    # 原实现把空数组也塞进 column_stack, 而 min_len 跳过空数组计算,
+    # 两者口径不一致 → ValueError: array at index N has size 0
+    # (回测起点早于部分 ETF 上市日时必现, 池内共 8 只如此)。
+    if not ret_series or any(len(r) == 0 for r in ret_series):
+        return None
+
+    min_len = min(len(r) for r in ret_series)
     if min_len < 20:
         return None
 

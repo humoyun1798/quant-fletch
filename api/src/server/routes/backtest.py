@@ -23,6 +23,39 @@ def _json_serial(obj: Any) -> str:
     raise TypeError(f'Type {type(obj)} not serializable')
 
 
+def _latest_data_date() -> str:
+    """返回 etf_daily 中最新的交易日 (ISO 字符串)。
+
+    用作回测的默认 end_date。原实现硬编码 '2025-12-31', 导致库里更新的数据
+    (当前已到 2026-09-18) 永远进不了回测区间, 界面上表现为「2026 年没有数据」。
+    """
+    try:
+        from db.duckdb import get_conn as duckdb_conn
+
+        ddb = duckdb_conn()
+        try:
+            row = ddb.execute('SELECT max(date) FROM etf_daily').fetchone()
+        finally:
+            ddb.close()
+        if row and row[0]:
+            return str(row[0])[:10]
+    except Exception:
+        logger.warning('读取最新交易日失败, 回落到今天', exc_info=True)
+    return date.today().isoformat()
+
+
+def _resolve_dates(body: dict[str, Any]) -> tuple[str, str]:
+    """解析回测区间。
+
+    未提供 (或为空串) 时: start 默认 2020-01-01, end 默认**库中最新交易日**,
+    这样新拉的数据会自动纳入回测, 不再需要改代码。
+    """
+    return (
+        body.get('start_date') or '2020-01-01',
+        body.get('end_date') or _latest_data_date(),
+    )
+
+
 # 内存存储 (ponytail: 重启丢失, PG backtest_run 表兜底)
 _run_store: dict[str, dict[str, Any]] = {}
 _progress_queues: dict[str, asyncio.Queue] = {}
@@ -33,8 +66,7 @@ async def start_backtest(body: dict[str, Any]) -> dict[str, Any]:
     """启动回测"""
     strategy_name = body.get('strategy', '')
     params = body.get('params', {})
-    start_date_str = body.get('start_date', '2020-01-01')
-    end_date_str = body.get('end_date', '2025-12-31')
+    start_date_str, end_date_str = _resolve_dates(body)
     benchmark = body.get('benchmark', '510300.SH')
 
     # 校验策略存在
@@ -416,8 +448,7 @@ async def compare_backtests(body: dict[str, Any]) -> dict[str, Any]:
         start_date, end_date, benchmark (共用区间)
     """
     strategies_in = body.get('strategies', [])
-    start_date_str = body.get('start_date', '2020-01-01')
-    end_date_str = body.get('end_date', '2025-12-31')
+    start_date_str, end_date_str = _resolve_dates(body)
     benchmark = body.get('benchmark', '510300.SH')
 
     if not strategies_in:
@@ -529,8 +560,7 @@ async def optimize_backtest(body: dict[str, Any]) -> dict[str, Any]:
     strategy_name = body.get('strategy', '')
     optimizer = body.get('optimizer', 'grid')
     objective = body.get('objective', 'sharpe')
-    start_date_str = body.get('start_date', '2020-01-01')
-    end_date_str = body.get('end_date', '2025-12-31')
+    start_date_str, end_date_str = _resolve_dates(body)
     benchmark = body.get('benchmark', '510300.SH')
 
     if not strategy_name:

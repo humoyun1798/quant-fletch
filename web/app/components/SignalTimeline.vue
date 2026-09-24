@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { SignalResult } from '../types/signal'
 import FeedbackEmptyState from '@antfu/design/components/Feedback/FeedbackEmptyState.vue'
+import { actionLabel } from '../config/labels'
 
 interface Props {
   signals: SignalResult[]
@@ -11,7 +12,7 @@ defineProps<Props>()
 
 <template>
   <section class="p-3">
-    <h2 class="text-sm font-medium color-base mb-2">Signal Timeline</h2>
+    <h2 class="text-sm font-medium color-base mb-2">信号时间线</h2>
 
     <FeedbackEmptyState
       v-if="signals.length === 0"
@@ -42,7 +43,7 @@ defineProps<Props>()
               class="px-1 py-px rounded text-micro font-mono"
               :class="sig.action === 'buy' ? 'bg-up-soft color-up border border-up-soft' : sig.action === 'sell' ? 'bg-down-soft color-down border border-down-soft' : 'op-fade border border-base'"
             >
-              {{ sig.action.toUpperCase() }} {{ sig.code }}
+              {{ actionLabel(sig.action) }} {{ sig.code }}
               <span class="op-fade">@ {{ (sig.target_weight * 100).toFixed(0) }}%</span>
             </span>
           </div>

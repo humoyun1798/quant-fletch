@@ -150,7 +150,7 @@ onUnmounted(() => {
 
 <template>
   <section class="p-3 border-b border-base">
-    <h2 class="text-sm font-medium color-base mb-2">ETF Heatmap</h2>
+    <h2 class="text-sm font-medium color-base mb-2">ETF 热力图</h2>
     <div
       v-if="etfs.length === 0"
       class="border border-base rounded flex items-center justify-center min-h-[200px]"

@@ -34,7 +34,7 @@ function onSelect(name: string) {
 
 <template>
   <section class="p-3 border-b border-base">
-    <h2 class="text-sm font-medium color-base mb-2">Available Strategies</h2>
+    <h2 class="text-sm font-medium color-base mb-2">可用策略</h2>
 
     <FeedbackSkeleton v-if="loading" variant="text" :lines="5" />
 

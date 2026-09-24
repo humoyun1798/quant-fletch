@@ -60,7 +60,7 @@ watch([upCount, downCount], () => {
 
 <template>
   <LayoutCard class="mb-3">
-    <h2 class="text-sm font-medium color-base mb-2">Market Snapshot</h2>
+    <h2 class="text-sm font-medium color-base mb-2">市场概览</h2>
 
     <FeedbackSkeleton v-if="loading" variant="text" :lines="3" />
     <div v-else-if="error" class="flex items-start gap-2">
@@ -78,7 +78,7 @@ watch([upCount, downCount], () => {
             <DisplayNumber :value="hasData" class="text-lg font-medium" />
           </span>
           <span class="text-xs op-fade">
-            / <DisplayNumber :value="total" class="text-xs" /> ETFs
+            / <DisplayNumber :value="total" class="text-xs" /> 只 ETF
           </span>
         </div>
         <DisplayDate

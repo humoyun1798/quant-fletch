@@ -1,14 +1,26 @@
 FROM python:3.14-slim AS builder
 WORKDIR /app
-COPY api/pyproject.toml ./
-RUN pip install uv && uv sync --frozen --no-dev
+# uv.lock 必须与 pyproject.toml 一并拷贝, 否则 `uv sync --frozen` 会因找不到锁文件直接失败。
+# --no-install-project: 本项目没有 [build-system], 且运行期依靠 PYTHONPATH=/app/src 提供
+# 源码 (见下方说明), 不需要把根项目自身装进 venv, 避免 setuptools 包发现的不确定性。
+COPY api/pyproject.toml api/uv.lock ./
+RUN pip install uv && uv sync --frozen --no-dev --no-install-project
 
 FROM python:3.14-slim AS runner
-RUN adduser -D -u 1001 appuser
+# 注意: 本基础镜像是 Debian 系, 必须用 useradd;
+# Alpine 的 `adduser -D -u 1001` 在此会因不识别 -D 直接失败 (exit 51)。
+RUN useradd --create-home --uid 1001 appuser
 WORKDIR /app
 COPY --from=builder /app/.venv /app/.venv
 COPY api/src/ /app/src/
+# 数据目录必须预先建好并归属 appuser。命名卷首次挂载到镜像中已存在的目录时,
+# 会继承该目录的属主; 若镜像里没有此目录, 卷会是 root:root, 导致 appuser 打开
+# DuckDB 时报 "Permission denied" 并陷入重启循环。
+RUN mkdir -p /app/data && chown -R appuser:appuser /app/data
 ENV PATH="/app/.venv/bin:$PATH"
+# 源码内使用以 src 为根的绝对导入 (如 `from db.duckdb import get_conn`),
+# 本地由 pyproject 的 pythonpath=["src"] 提供, 容器内必须显式注入, 否则启动即 ImportError。
+ENV PYTHONPATH=/app/src
 USER appuser
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=3s \

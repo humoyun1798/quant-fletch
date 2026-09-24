@@ -18,16 +18,35 @@ def clean_etf_data(
         2. 去重
         3. 前复权校准 (可选)
         4. 缺失值填补
+        5. 断层检测 + 前复权回补
     """
     df = _normalize_code(df, code)
     df = _deduplicate(df)
     if adj_close_ref is not None and not adj_close_ref.is_empty():
         df = _adjust_close(df, adj_close_ref)
     else:
-        # ponytail: 无复权参考时用 close 作为 adj_close, 当东方财富数据就绪后校准
+        # ponytail: 无复权参考时用 close 作为 adj_close —— 但 close 是不复权价、
+        # 含公司行为断层, 所以下面第 5 步的断层回补是必需的, 不是可选项。
         df = df.with_columns(pl.col('close').alias('adj_close'))
     df = _impute_missing(df)
-    return df
+    return _fix_price_gaps(code, df)
+
+
+def _fix_price_gaps(code: str, df: pl.DataFrame) -> pl.DataFrame:
+    """断层检测 + 前复权回补（原理见 data/price_adjust.py 的模块说明）。
+
+    份额折算 / 分红会让不复权价出现单日无法用涨跌停解释的跳变
+    （如 515880 通信ETF 在 2026-02-03 单日 -65.70%）。这类断层会被趋势策略
+    误判为「跌破均线」并触发假止损 —— 实测曾使回测净值单日暴跌 -35.26%。
+    """
+    from .price_adjust import fix_adj_close
+
+    fixed, gaps = fix_adj_close(code, df)
+    if gaps:
+        logger.info(f'[{code}] 检测到 {len(gaps)} 处价格断层, 已前复权回补:')
+        for g in gaps:
+            logger.info(f'    {g}')
+    return fixed
 
 
 def _normalize_code(df: pl.DataFrame, code: str) -> pl.DataFrame:

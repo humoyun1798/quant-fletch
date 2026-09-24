@@ -25,6 +25,9 @@ class MomentumRotate(BaseStrategy):
         tags=['动量', '趋势', 'ETF'],
         min_bars=60,
         rebalance_freq='weekly',
+        # 目标组合语义: 本期该持有 top_n 这几只 → 引擎自动卖出目标之外的持仓。
+        # 修此前的缺陷: 本策略只发 buy、从不发 sell, 导致只买不卖、最终持有全池。
+        position_mode='target',
     )
 
     @classmethod

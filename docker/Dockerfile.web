@@ -2,13 +2,31 @@ FROM node:22-alpine AS deps
 WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY web/package.json ./web/
-RUN corepack enable && pnpm install --frozen-lockfile
+# 必须使用 pnpm 9.x —— 本仓库 pnpm-lock.yaml 由 pnpm 9 生成 (lockfileVersion 9.0),
+# 且根项目依赖使用 catalog: 协议。若用 corepack 默认拉取的 pnpm 12 会有两个问题:
+#   1) 报 ERR_PNPM_OUTDATED_LOCKFILE (锁文件 specifier 与 package.json 不一致);
+#   2) 其 trustPolicy: no-downgrade 供应链校验会拒绝锁文件里已存在的 semver@6.3.1。
+# 固定 9.15.9 可忠实复用已提交的锁文件, 不做任何依赖重新解析。
+RUN npm i -g pnpm@9.15.9 && pnpm install --frozen-lockfile
 
 FROM node:22-alpine AS builder
 WORKDIR /app
+# builder 从 node:22-alpine 重新开始, 不继承 deps 阶段全局安装的 pnpm。
+# 原 Dockerfile 在此直接调用 `pnpm build`, 会因 command not found 失败 (exit 127)。
+RUN npm i -g pnpm@9.15.9
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/web/node_modules ./web/node_modules
 COPY . .
+# 以下两个变量必须在 `nuxt build` 之前注入 —— 它们都是构建期求值的:
+#   API_BASE_URL   → nuxt.config.ts 的 routeRules 代理目标 (SSR 侧请求后端用)
+#   VITE_WS_ORIGIN → 浏览器侧 WebSocket 直连地址 (回测进度推送用)
+# 仅在 compose 里设 runtime environment 对二者无效, 必须作为 build args 传进来。
+# 默认值对内网直连的 docker compose 生效; 要走内网穿透时在 compose 的
+# build.args 里覆盖 (见 docker-compose.yml 的 nuxt.build.args)。
+ARG API_BASE_URL=http://api:8000
+ARG VITE_WS_ORIGIN=ws://localhost:18000
+ENV API_BASE_URL=$API_BASE_URL
+ENV VITE_WS_ORIGIN=$VITE_WS_ORIGIN
 RUN cd web && pnpm build
 
 FROM node:22-alpine AS runner

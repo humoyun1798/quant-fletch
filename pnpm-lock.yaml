@@ -22,6 +22,9 @@ catalogs:
     simple-git-hooks:
       specifier: ^2.11.0
       version: 2.13.1
+    typescript:
+      specifier: ^5.9.2
+      version: 5.9.2
   gsap:
     gsap:
       specifier: ^3.12.0
@@ -55,8 +58,17 @@ catalogs:
     '@vue/test-utils':
       specifier: ^2.4.0
       version: 2.4.11
+    vitest:
+      specifier: ^3.2.7
+      version: 3.2.7
   unocss:
     '@unocss/eslint-plugin':
+      specifier: ^66.7.5
+      version: 66.7.5
+    '@unocss/nuxt':
+      specifier: ^66.7.5
+      version: 66.7.5
+    '@unocss/preset-web-fonts':
       specifier: ^66.7.5
       version: 66.7.5
     unocss:
@@ -71,10 +83,10 @@ importers:
         specifier: catalog:dev
         version: 9.3.0(@typescript-eslint/typescript-estree@8.66.0(typescript@5.9.2))(@typescript-eslint/utils@8.66.0(eslint@10.8.0(jiti@2.7.0))(typescript@5.9.2))(@unocss/eslint-plugin@66.7.5(eslint@10.8.0(jiti@2.7.0))(typescript@5.9.2))(@vue/compiler-sfc@3.5.41)(eslint@10.8.0(jiti@2.7.0))(typescript@5.9.2)(vitest@3.2.7(@types/debug@4.1.13)(@types/node@26.1.2)(jiti@2.7.0)(jsdom@30.0.1)(lightningcss@1.33.0)(terser@5.49.2)(yaml@2.9.0))
       '@unocss/nuxt':
-        specifier: ^66.7.5
+        specifier: catalog:unocss
         version: 66.7.5(esbuild@0.28.1)(magic-string@1.1.0)(magicast@0.5.4)(rolldown@1.2.3)(rollup@4.62.4)(unplugin@3.3.0(esbuild@0.28.1)(rolldown@1.2.3)(rollup@4.62.4)(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.2)(yaml@2.9.0))(webpack@5.109.2(esbuild@0.28.1)(lightningcss@1.33.0)))(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.2)(yaml@2.9.0))(webpack@5.109.2(esbuild@0.28.1)(lightningcss@1.33.0))
       '@unocss/preset-web-fonts':
-        specifier: ^66.7.5
+        specifier: catalog:unocss
         version: 66.7.5
       lint-staged:
         specifier: catalog:dev
@@ -83,7 +95,7 @@ importers:
         specifier: catalog:dev
         version: 2.13.1
       typescript:
-        specifier: ^5.9.2
+        specifier: catalog:dev
         version: 5.9.2
 
   web:
@@ -165,7 +177,7 @@ importers:
         specifier: catalog:unocss
         version: 66.7.5(@unocss/webpack@66.7.5(esbuild@0.28.1)(rolldown@1.2.3)(rollup@4.62.4)(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.2)(yaml@2.9.0))(webpack@5.109.2(esbuild@0.28.1)(lightningcss@1.33.0)(postcss@8.5.26)))(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.2)(yaml@2.9.0))
       vitest:
-        specifier: ^3.2.7
+        specifier: catalog:test
         version: 3.2.7(@types/debug@4.1.13)(@types/node@26.1.2)(jiti@2.7.0)(jsdom@30.0.1)(lightningcss@1.33.0)(terser@5.49.2)(yaml@2.9.0)
       vue-tsc:
         specifier: ^3.3.9
